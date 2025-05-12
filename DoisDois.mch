@@ -37,10 +37,16 @@ INVARIANT
     historico = origemTransacoes ~ \/ destinoTransacoes~ &
     statusFatura : faturas --> STATUSFATURA &
     totalFatura : faturas --> NAT &
-    ordemFatura: contas +-> (NAT >+> faturas) &
+    ordemFatura: cartoes +-> (NAT >+> faturas) &
     transacoesFatura: faturas  -->  transacoes &
-    faturaAtual : contas  +-> faturas &
-    tipoCartao~[{credito}] = dom(limite)
+    faturaAtual : cartoes +-> faturas &
+    tipoCartao~[{credito}] = dom(limite) &
+    tipoCartao~[{credito}] = dom(faturaAtual) & /* Todo cr deve ter fatura atual e toda fatura é de um cr */
+    tipoCartao~[{credito}] = dom(ordemFatura) & /* Todo cr estabelece ordem das faturas */
+    !(c1,c2).( c1 : cartoes & c2 : cartoes 
+          & titular(c1) = titular(c2) & tipoCartao(c1) = tipoCartao(c2) => c1 = c2 ) &
+    !ff.( ff : faturas => #(cc,nn) .( cc : cartoes & nn : dom(ordemFatura(cc)) & (ordemFatura(cc))(nn) = ff ) ) /*Toda fatura de um cartão deve estar associada a um índice de ordem */
+    
     
 INITIALISATION
       contas := {} || cartoes := {} || faturas := {} || transacoes := {} || saldoCorrente := {} || saldoPoupanca := {} || 
