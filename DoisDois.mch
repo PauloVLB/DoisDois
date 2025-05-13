@@ -34,7 +34,7 @@ INVARIANT
     origemTransacoes : transacoes --> contas &
     destinoTransacoes: transacoes --> contas &
     valorTransacoes : transacoes --> NAT &
-    historico = origemTransacoes ~ \/ destinoTransacoes~ &
+    historico : contas --> POW(transacoes) &
     statusFatura : faturas --> STATUSFATURA &
     totalFatura : faturas --> NAT &
     ordemFatura: cartoes +-> (NAT >+> faturas) &
@@ -45,11 +45,11 @@ INVARIANT
     tipoCartao~[{credito}] = dom(ordemFatura) & /* Todo cr estabelece ordem das faturas */
     !(c1,c2).( c1 : cartoes & c2 : cartoes 
           & titular(c1) = titular(c2) & tipoCartao(c1) = tipoCartao(c2) => c1 = c2 ) &
-    !ff.( ff : faturas => #(cc,nn) .( cc : cartoes & nn : dom(ordemFatura(cc)) & (ordemFatura(cc))(nn) = ff ) ) /*Toda fatura de um cartão deve estar associada a um índice de ordem */
-    
+    !ff.( ff : faturas => #(cc,nn) .( cc : cartoes & nn : dom(ordemFatura(cc)) & (ordemFatura(cc))(nn) = ff ) ) & /*Toda fatura de um cartão deve estar associada a um índice de ordem */
+    !cc.(cc : contas => historico(cc) = origemTransacoes~[{cc}] \/ destinoTransacoes~[{cc}])
     
 INITIALISATION
-      contas := {} || cartoes := {} || faturas := {} || transacoes := {} || saldoCorrente := {} || saldoPoupanca := {} || 
+    contas := {} || cartoes := {} || faturas := {} || transacoes := {} || saldoCorrente := {} || saldoPoupanca := {} || 
     limite := {} || statusFatura := {} || totalFatura := {} || ordemFatura := {} ||
     titular := {} || tipoCartao := {} || bloqueados := {} || origemTransacoes := {} || destinoTransacoes := {} ||
     valorTransacoes := {} || historico := {} || transacoesFatura := {} || faturaAtual := {}
@@ -63,7 +63,8 @@ adicionarConta(cc) =
     THEN
         contas := contas \/ {cc} ||
         saldoCorrente := saldoCorrente \/ {cc |-> 0} ||
-        saldoPoupanca := saldoPoupanca \/ {cc |-> 0}
+        saldoPoupanca := saldoPoupanca \/ {cc |-> 0} ||
+        historico := historico \/ {cc |-> {}}
     END;
     
 
