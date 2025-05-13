@@ -3,7 +3,7 @@ MACHINE
     
 SETS 
     CONTA; FATURA; CARTAO; TRANSACAO;
-    STATUSFATURA = {paga, vencida};
+    STATUSFATURA = {paga, vencida, aberta};
     TIPOCARTAO = {credito, debito}
 
 CONSTANTS         
@@ -16,18 +16,18 @@ PROPERTIES
     maxParcelas : NAT & maxParcelas > 0
 VARIABLES
     contas, cartoes, faturas, transacoes, saldoCorrente, saldoPoupanca, 
-    limite, statusFatura, totalFatura, ordemFatura,
+    limite, statusFatura, totalFatura,
     titular, tipoCartao, bloqueados, origemTransacoes, destinoTransacoes,
-    valorTransacoes, historico, transacoesFatura, faturaAtual
+    valorTransacoes, historico, transacoesFatura, faturaAtual, faturaOrdem, faturaCartao
     
 INVARIANT
     contas <: CONTA &
     cartoes <: CARTAO &
     faturas <: FATURA &
     transacoes <: TRANSACAO &
-    saldoCorrente : contas  --> NAT &
-    saldoPoupanca : contas  --> NAT &
-    limite : cartoes --> NAT  &
+    saldoCorrente : contas --> NAT &
+    saldoPoupanca : contas --> NAT &
+    limite : cartoes +-> NAT  &
     titular : cartoes --> contas &
     tipoCartao : cartoes --> TIPOCARTAO &
     bloqueados <: cartoes &
@@ -37,23 +37,25 @@ INVARIANT
     historico : contas --> POW(transacoes) &
     statusFatura : faturas --> STATUSFATURA &
     totalFatura : faturas --> NAT &
-    ordemFatura: cartoes +-> (NAT >+> faturas) &
-    transacoesFatura: faturas  -->  transacoes &
-    faturaAtual : cartoes +-> faturas &
-    tipoCartao~[{credito}] = dom(limite) &
-    tipoCartao~[{credito}] = dom(faturaAtual) & /* Todo cr deve ter fatura atual e toda fatura é de um cr */
-    tipoCartao~[{credito}] = dom(ordemFatura) & /* Todo cr estabelece ordem das faturas */
+    faturaCartao: faturas --> cartoes &
+    faturaOrdem : faturas --> NAT &
+    transacoesFatura: faturas --> POW(transacoes) &
+    faturaAtual : cartoes >+> faturas &
+    tipoCartao~[{credito}] = dom(faturaAtual) &
+    tipoCartao~[{credito}] = ran(faturaCartao) &
+    tipoCartao~[{credito}] = dom(limite) & /* Todo cr estabelece ordem das faturas */
     !(c1,c2).( c1 : cartoes & c2 : cartoes 
           & titular(c1) = titular(c2) & tipoCartao(c1) = tipoCartao(c2) => c1 = c2 ) &
-    !ff.( ff : faturas => #(cc,nn) .( cc : cartoes & nn : dom(ordemFatura(cc)) & (ordemFatura(cc))(nn) = ff ) ) & /*Toda fatura de um cartão deve estar associada a um índice de ordem */
-    !cc.(cc : contas => historico(cc) = origemTransacoes~[{cc}] \/ destinoTransacoes~[{cc}])
+    !cc.(cc : contas => historico(cc) = origemTransacoes~[{cc}] \/ destinoTransacoes~[{cc}]) &
+    !(f1, f2).((f1 : faturas & f2 : faturas & f1 /= f2 & faturaCartao(f1) = faturaCartao(f2)) => 
+        faturaOrdem(f1) /= faturaOrdem(f2))
     
 INITIALISATION
     contas := {} || cartoes := {} || faturas := {} || transacoes := {} || saldoCorrente := {} || saldoPoupanca := {} || 
-    limite := {} || statusFatura := {} || totalFatura := {} || ordemFatura := {} ||
+    limite := {} || statusFatura := {} || totalFatura := {}  || faturaOrdem := {} || faturaCartao := {} ||
     titular := {} || tipoCartao := {} || bloqueados := {} || origemTransacoes := {} || destinoTransacoes := {} ||
     valorTransacoes := {} || historico := {} || transacoesFatura := {} || faturaAtual := {}
-    
+
 OPERATIONS
 
 adicionarConta(cc) =
@@ -79,8 +81,30 @@ removerConta(cc) =
         saldoCorrente := {cc} <<| saldoCorrente ||
         saldoPoupanca := {cc} <<| saldoPoupanca ||
         titular := titular |>> {cc}
+    END;
+
+adicionarCartao(cc, tc, acc) =
+    PRE
+     cc : CARTAO & cc /: cartoes & tc : TIPOCARTAO & acc : contas & tipoCartao~[{tc}] /\ titular~[{acc}] = {}
+    THEN
+      cartoes := cartoes \/ {cc} ||
+      tipoCartao(cc) := tc ||
+      titular(cc) := acc ||
+      IF 
+          tc = credito 
+      THEN
+        limite(cc) := limitePadrao  ||
+        ANY ff WHERE ff : FATURA & ff /: faturas 
+        THEN
+          faturas := faturas \/ {ff} ||
+          faturaAtual(cc) := ff  ||
+          statusFatura(ff) := aberta ||
+          totalFatura(ff) := 0 ||
+          transacoesFatura(ff) := {} ||     
+          faturaCartao(ff) := cc || faturaOrdem(ff) := 0
+        END
+      END
     END
-    
           
 END
 
