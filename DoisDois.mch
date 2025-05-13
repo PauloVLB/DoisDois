@@ -46,7 +46,6 @@ INVARIANT
     tipoCartao~[{credito}] = dom(limite) & /* Todo cr estabelece ordem das faturas */
     !(c1,c2).( c1 : cartoes & c2 : cartoes 
           & titular(c1) = titular(c2) & tipoCartao(c1) = tipoCartao(c2) => c1 = c2 ) &
-    !cc.(cc : contas => historico(cc) = origemTransacoes~[{cc}] \/ destinoTransacoes~[{cc}]) &
     !(f1, f2).((f1 : faturas & f2 : faturas & f1 /= f2 & faturaCartao(f1) = faturaCartao(f2)) => 
         faturaOrdem(f1) /= faturaOrdem(f2))
     
