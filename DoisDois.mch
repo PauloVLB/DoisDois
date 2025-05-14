@@ -127,6 +127,12 @@ adicionarCartao(ct, tp, cc) =
       END
     END;
 
+hh <-- historico(cc) = 
+   PRE 
+       cc : contas
+   THEN
+       hh := origemTransacoes~[{cc}] \/ destinoTransacoes~[{cc}]
+   END;
     
 
 removerConta(cc) = 
