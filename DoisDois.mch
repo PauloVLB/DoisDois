@@ -84,6 +84,24 @@ sacarCorrente(cc, valor) =
         END
     END;
 
+sacarPoupanca(cc, valor) =
+    PRE
+        cc : contas & valor : NAT & valor <= saldoPoupanca(cc)
+    THEN
+        saldoPoupanca(cc) := saldoPoupanca(cc) - valor ||
+        saldoCorrente(cc) := saldoCorrente(cc) + valor ||
+        ANY
+            tt
+        WHERE
+            tt : TRANSACAO & tt /: transacoes
+        THEN
+           transacoes := transacoes \/ {tt} ||
+           origemTransacoes(tt) := cc ||
+           destinoTransacoes(tt) := cc ||
+           valorTransacoes(tt) := valor
+       END
+    END;
+
 adicionarCartao(ct, tp, cc) =
     PRE
         ct : CARTAO & ct /: cartoes & tp : TIPOCARTAO & cc : contas & tipoCartao~[{tp}] /\ titular~[{cc}] = {}
