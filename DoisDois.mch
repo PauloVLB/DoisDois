@@ -29,23 +29,36 @@ INVARIANT
     transacoes <: TRANSACAO &
     saldoCorrente : contas --> NAT &
     saldoPoupanca : contas --> NAT &
-    origemTransacoes : transacoes --> contas &
-    destinoTransacoes: transacoes --> contas &
+    origemTransacoes : transacoes --> CONTA &
+    destinoTransacoes: transacoes --> CONTA &
     valorTransacoes : transacoes --> NAT &
     tipoTransacoes : transacoes --> TIPOTRANSACAO &
-    limite : cartoes +-> NAT  &
-    titular : cartoes >-> contas &
+    titular : cartoes --> contas &
     tipoCartao : cartoes --> TIPOCARTAO &
+    limite : cartoes +-> NAT  &
     bloqueados <: cartoes &
     statusFatura : faturas --> STATUSFATURA &
     totalFatura : faturas --> NAT &
     faturaCartao: faturas --> cartoes &
     faturaOrdem : faturas --> NAT &
-    tipoCartao~[{credito}] = dom(limite) &
     tipoCartao~[{credito}] = ran(faturaCartao) &
+    tipoCartao~[{credito}] = dom(limite) &
     !(f1, f2).((f1 : faturas & f2 : faturas & f1 /= f2 & faturaCartao(f1) = faturaCartao(f2)) => 
         faturaOrdem(f1) /= faturaOrdem(f2)) &
+    !(c1,c2).( c1 : cartoes & c2 : cartoes 
+         & titular(c1) = titular(c2) & tipoCartao(c1) = tipoCartao(c2) => c1 = c2 ) &
     faturaAtual : tipoCartao~[{credito}] --> faturas 
+    
+DEFINITIONS                                          
+    fCartao(ct) == faturaCartao~[{ct}];
+    parcela(valor, parcelas) == valor / parcelas;
+    ordemAtual(ct) == faturaOrdem(faturaAtual(ct));
+    /* faturas que receberão parcelas */
+    faturasIntervalo(ct, parcelas) == 
+        { ff | ff : faturas & faturaCartao(ff) = ct &
+              faturaOrdem(ff) >= ordemAtual(ct) &
+              faturaOrdem(ff) < ordemAtual(ct) + parcelas };
+    limiteValido(ct, valor, ff) == (totalFatura(ff) + valor <= limite(ct));
 
 INITIALISATION
     contas := {} || cartoes := {} || faturas := {} || 
