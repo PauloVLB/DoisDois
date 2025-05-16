@@ -45,7 +45,10 @@ DEFINITIONS
         { ff | ff : faturas & faturaCartao(ff) = ct &
                               faturaOrdem(ff) : (ordemAtual(ct) .. (ordemAtual(ct) + parcelas - 1))};
     limiteValido(ct, valor, ff) == (totalFatura(ff) + valor <= limite(ct));
-    ordensFaturas(ct) == ran(faturaCartao~[{ct}] <| faturaOrdem)
+    ordensFaturas(ct) == ran(faturaCartao~[{ct}] <| faturaOrdem);
+    transacoesDuplicadas(cc) == 
+        (( origemTransacoes~[{cc}] /\ tipoTransacoes~[{depositoCorrente}] ) - destinoTransacoes~[{cc}])
+        \/ (( destinoTransacoes~[{cc}] /\ tipoTransacoes~[{tranCredito}] ) - origemTransacoes~[{cc}])
 
 INITIALISATION
     contas := {} || cartoes := {} || faturas := {} || 
@@ -218,7 +221,7 @@ hh <-- historico(cc) =
    PRE 
        cc : contas
    THEN
-       hh := origemTransacoes~[{cc}] \/ destinoTransacoes~[{cc}]
+      hh := (origemTransacoes~[{cc}] \/ destinoTransacoes~[{cc}]) - transacoesDuplicadas(cc)
    END;
    
 sc, sp <-- consultarSaldos(cc) = 
@@ -268,7 +271,15 @@ ll <-- consultarLimite(ct) =
         ct : creditos
     THEN
         ll := limite(ct)
-    END;    
+    END; 
+
+oo, dd, vv, tp <-- consultarTransacao(tt) = 
+    PRE
+        tt : transacoes
+    THEN
+        oo := origemTransacoes(tt) || dd := destinoTransacoes(tt) || 
+        vv := valorTransacoes(tt) || tp := tipoTransacoes(tt)
+    END;   
 
 removerConta(cc) = 
     PRE
