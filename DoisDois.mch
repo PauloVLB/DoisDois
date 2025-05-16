@@ -1,18 +1,8 @@
 MACHINE 
     DoisDois
     
-SETS 
-    CONTA; FATURA; CARTAO; TRANSACAO;
-    STATUSFATURA = {paga, vencida, aberta};
-    TIPOCARTAO = {credito, debito};
-    TIPOTRANSACAO = {saqueCorrente, saquePoupanca, depositoCredito, depositoCorrente, tranCredito, tranDebito}
-
-CONSTANTS         
-    taxaRendimento, jurosFatura, limitePadrao, maxParcelas    
-
-PROPERTIES        
-    taxaRendimento : NAT1 & jurosFatura : NAT1 & 
-    limitePadrao : NAT & maxParcelas : NAT1 
+SEES
+    DoisDois_Ctx
     
 VARIABLES
     contas, cartoes, faturas, transacoes, saldoCorrente, saldoPoupanca, 
@@ -278,8 +268,7 @@ ll <-- consultarLimite(ct) =
         ct : creditos
     THEN
         ll := limite(ct)
-    END;
-    
+    END;    
 
 removerConta(cc) = 
     PRE
