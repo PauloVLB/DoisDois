@@ -11,10 +11,8 @@ CONSTANTS
     taxaRendimento, jurosFatura, limitePadrao, maxParcelas    
 
 PROPERTIES        
-    taxaRendimento : NAT & taxaRendimento > 0 &
-    jurosFatura : NAT & jurosFatura > 0 &
-    limitePadrao : NAT &
-    maxParcelas : NAT & maxParcelas > 0
+    taxaRendimento : NAT1 & jurosFatura : NAT1 & 
+    limitePadrao : NAT & maxParcelas : NAT1 
     
 VARIABLES
     contas, cartoes, faturas, transacoes, saldoCorrente, saldoPoupanca, 
@@ -29,36 +27,35 @@ INVARIANT
     transacoes <: TRANSACAO &
     saldoCorrente : contas --> NAT &
     saldoPoupanca : contas --> NAT &
-    origemTransacoes : transacoes --> CONTA &
-    destinoTransacoes: transacoes --> CONTA &
+    origemTransacoes : transacoes --> contas &
+    destinoTransacoes: transacoes --> contas &
     valorTransacoes : transacoes --> NAT &
     tipoTransacoes : transacoes --> TIPOTRANSACAO &
     titular : cartoes --> contas &
     tipoCartao : cartoes --> TIPOCARTAO &
-    limite : cartoes +-> NAT  &
+    limite : creditos --> NAT  &
     bloqueados <: cartoes &
     statusFatura : faturas --> STATUSFATURA &
     totalFatura : faturas --> NAT &
-    faturaCartao: faturas --> cartoes &
+    faturaCartao: faturas -->> creditos &
     faturaOrdem : faturas --> NAT &
-    tipoCartao~[{credito}] = ran(faturaCartao) &
-    tipoCartao~[{credito}] = dom(limite) &
+    faturaAtual : creditos >-> faturas  &
     !(f1, f2).((f1 : faturas & f2 : faturas & f1 /= f2 & faturaCartao(f1) = faturaCartao(f2)) => 
         faturaOrdem(f1) /= faturaOrdem(f2)) &
     !(c1,c2).( c1 : cartoes & c2 : cartoes 
          & titular(c1) = titular(c2) & tipoCartao(c1) = tipoCartao(c2) => c1 = c2 ) &
-    faturaAtual : tipoCartao~[{credito}] --> faturas 
-    
-DEFINITIONS                                          
-    fCartao(ct) == faturaCartao~[{ct}];
-    parcela(valor, parcelas) == valor / parcelas;
-    ordemAtual(ct) == faturaOrdem(faturaAtual(ct));
+    !ct.(ct : creditos => (ordensFaturas(ct) = 0 .. (card( faturaCartao~[{ct}] ) - 1 ))) &
+    (faturaAtual;faturaCartao) = id(creditos)
+
+DEFINITIONS     
+    creditos == tipoCartao~[{credito}];                                       
+    ordemAtual(ct) == faturaOrdem(faturaAtual(ct));      
     /* faturas que receberão parcelas */
-    faturasIntervalo(ct, parcelas) == 
+    faturasExistentes(ct, parcelas) == 
         { ff | ff : faturas & faturaCartao(ff) = ct &
-              faturaOrdem(ff) >= ordemAtual(ct) &
-              faturaOrdem(ff) < ordemAtual(ct) + parcelas };
+                              faturaOrdem(ff) : (ordemAtual(ct) .. (ordemAtual(ct) + parcelas - 1))};
     limiteValido(ct, valor, ff) == (totalFatura(ff) + valor <= limite(ct));
+    ordensFaturas(ct) == ran(faturaCartao~[{ct}] <| faturaOrdem)
 
 INITIALISATION
     contas := {} || cartoes := {} || faturas := {} || 
@@ -82,7 +79,7 @@ adicionarConta(cc) =
 
 sacarCorrente(cc, valor) =
     PRE 
-        cc: contas & valor : NAT & valor <= saldoCorrente(cc)
+        cc: contas & valor : 1..saldoCorrente(cc)
     THEN 
         saldoCorrente(cc) := saldoCorrente(cc) - valor ||
         ANY 
@@ -100,7 +97,7 @@ sacarCorrente(cc, valor) =
 
 sacarPoupanca(cc, valor) =
     PRE
-        cc : contas & valor : NAT & valor <= saldoPoupanca(cc)
+        cc : contas & valor : 1..saldoPoupanca(cc) & saldoCorrente(cc) + valor : NAT
     THEN
         saldoPoupanca(cc) := saldoPoupanca(cc) - valor ||
         saldoCorrente(cc) := saldoCorrente(cc) + valor ||
@@ -125,7 +122,7 @@ adicionarCartao(ct, tp, cc) =
         tipoCartao(ct) := tp ||
         titular(ct) := cc ||
       IF 
-          tp = credito 
+          tp = credito
       THEN
           limite(ct) := limitePadrao  ||
           ANY 
@@ -139,7 +136,7 @@ adicionarCartao(ct, tp, cc) =
               totalFatura(ff) := 0 ||   
               faturaCartao(ff) := ct || 
 	          faturaOrdem(ff) := 0 
-            END
+          END
       END
     END;
     
@@ -151,18 +148,20 @@ removerCartao(ct) =
         bloqueados := cartoes - {ct} ||
         tipoCartao := {ct} <<| tipoCartao ||
         titular := {ct} <<| titular ||
-        IF 
-            tipoCartao(ct) = credito
-        THEN 
-            limite := {ct} <<| limite ||
-            LET 
-                fCartao BE fCartao = faturaCartao~[{ct}]
-            IN
-                faturas := faturas - fCartao ||
-                statusFatura := fCartao <<| statusFatura ||
-                totalFatura := fCartao <<| totalFatura ||
-                faturaCartao := fCartao <<| faturaCartao ||
-                faturaOrdem := fCartao <<| faturaOrdem ||
+        LET 
+            faturasCartao 
+        BE 
+            faturasCartao = faturaCartao~[{ct}] 
+        IN
+            IF 
+                ct : creditos
+            THEN 
+                limite := {ct} <<| limite ||
+                faturas := faturas - faturasCartao ||
+                statusFatura := faturasCartao <<| statusFatura ||
+                totalFatura := faturasCartao <<| totalFatura ||
+                faturaCartao := faturasCartao <<| faturaCartao ||
+                faturaOrdem := faturasCartao <<| faturaOrdem ||
                 faturaAtual := {ct} <<| faturaAtual
             END
         END
@@ -174,22 +173,57 @@ pagarFatura(cc, ff) =
         totalFatura(ff) > 0 & saldoCorrente(cc) >= totalFatura(ff)
     THEN
         saldoCorrente(cc) := saldoCorrente(cc) - totalFatura(ff) ||
-        statusFatura(ff) := paga
+        statusFatura(ff) := paga 
     END;
     
-ida <-- compraParcelada(origem, destino, valor, parcelas) =
-    PRE origem : cartoes & destino : contas & titular(origem) /= destino & 
-        valor : NAT & parcelas : NAT & parcelas <= maxParcelas & 
-        limite(origem) >= valor & origem /: bloqueados 
-        /*Conta tem que possuir cartão*/
-        /*Valor dentro do limite do cartão*/
+compraParcelada(origem, destino, valor, parcelas) =
+    PRE origem : cartoes & origem : creditos & destino : contas & 
+        titular(origem) /= destino & 
+        valor : NAT1 & parcelas : 1..maxParcelas & 
+        (valor mod parcelas) = 0 &
+        origem /: bloqueados &
+        (valor / parcelas) <= limite(origem) &
+        !ff.(ff : faturasExistentes(origem, parcelas) => 
+            (limiteValido(origem, (valor / parcelas), ff)))
     THEN
-        /*Transação unica para destino*/
-        /* parcelas para origem, cada uma em uma fatura*/
-        ida := 0
+       LET 
+           ordensAusentes, parcela
+       BE 
+           /*ordensAusentes = ordensNecessarias - ordensExistentes*/
+           ordensAusentes = (ordemAtual(origem) .. (ordemAtual(origem) + parcelas - 1)) - 
+                             faturaOrdem[faturasExistentes(origem, parcelas)] &
+           parcela = (valor / parcelas)
+       IN
+           ANY 
+               tDestino, tOrigem,
+               novasFaturas, novaOrdem 
+           WHERE
+               tDestino : TRANSACAO & tDestino /: transacoes &
+               tOrigem <: TRANSACAO - (transacoes \/ {tDestino}) &
+               tOrigem : FIN(tOrigem) & card(tOrigem) = parcelas &
+               
+               novasFaturas <: FATURA - faturas & novasFaturas : FIN(novasFaturas) &
+               card(novasFaturas) = card(ordensAusentes) &
+               novaOrdem : novasFaturas -->> ordensAusentes
+           THEN
+               /*transações na conta de origem e destino*/
+               transacoes := transacoes \/ {tDestino} \/ tOrigem ||
+               origemTransacoes := origemTransacoes \/ {tDestino |-> titular(origem)} \/ (tOrigem * {titular(origem)}) ||
+               destinoTransacoes := destinoTransacoes \/ {tDestino |-> destino} \/ (tOrigem * {destino}) ||
+               valorTransacoes := valorTransacoes \/ {tDestino |-> valor} \/ (tOrigem * {parcela}) ||
+               tipoTransacoes := tipoTransacoes \/ {tDestino |-> depositoCorrente} \/ (tOrigem * {tranCredito})  ||
+               saldoCorrente(destino) := saldoCorrente(destino) + valor ||
+               /*criar faturas novas*/
+               faturas := faturas \/ novasFaturas ||
+               statusFatura := statusFatura \/ (novasFaturas * {aberta}) ||
+               faturaCartao := faturaCartao \/ (novasFaturas * {origem}) ||
+               faturaOrdem := faturaOrdem \/ novaOrdem ||
+               totalFatura := totalFatura <+ (%ff.(ff : faturasExistentes(origem, parcelas) | totalFatura(ff) + parcela) \/  (novasFaturas * {parcela}))
+           END 
+       END 
     END;
-
     
+
 hh <-- historico(cc) = 
    PRE 
        cc : contas
