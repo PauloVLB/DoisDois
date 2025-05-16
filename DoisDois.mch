@@ -230,6 +230,55 @@ hh <-- historico(cc) =
    THEN
        hh := origemTransacoes~[{cc}] \/ destinoTransacoes~[{cc}]
    END;
+   
+sc, sp <-- consultarSaldos(cc) = 
+    PRE 
+        cc : contas
+    THEN
+        sc := saldoCorrente(cc) || sp := saldoPoupanca(cc)
+    END;
+
+bloquearCartao(ct) =
+    PRE 
+        ct : cartoes & ct /: bloqueados
+    THEN 
+        bloqueados := bloqueados \/ {ct}
+    END;
+
+desbloquearCartao(ct) = 
+    PRE 
+        ct : cartoes & ct : bloqueados
+    THEN
+       bloqueados := bloqueados - {ct}
+    END;
+    
+atualizarLimite(ct, valor) = 
+    PRE 
+      ct : creditos & ct /: bloqueados & valor : NAT
+    THEN
+      limite(ct) := valor
+    END;
+    
+total <-- consultarFaturaAtual(ct) =
+    PRE 
+        ct : creditos
+    THEN
+        total := totalFatura(faturaAtual(ct))
+    END;
+    
+ctConta <-- consultarCartoesConta(cc) = 
+    PRE 
+        cc : contas
+    THEN
+        ctConta := titular~[{cc}]
+    END;
+    
+ll <-- consultarLimite(ct) = 
+    PRE
+        ct : creditos
+    THEN
+        ll := limite(ct)
+    END;
     
 
 removerConta(cc) = 
