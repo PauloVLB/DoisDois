@@ -17,8 +17,8 @@ INVARIANT
     transacoes <: TRANSACAO &
     saldoCorrente : contas --> NAT &
     saldoPoupanca : contas --> NAT &
-    origemTransacoes : transacoes --> contas &
-    destinoTransacoes: transacoes --> contas &
+    origemTransacoes : transacoes --> CONTA &
+    destinoTransacoes: transacoes --> CONTA &
     valorTransacoes : transacoes --> NAT &
     tipoTransacoes : transacoes --> TIPOTRANSACAO &
     titular : cartoes --> contas &
@@ -315,7 +315,6 @@ removerConta(cc) =
     END
 
 END
-
 
 
 
