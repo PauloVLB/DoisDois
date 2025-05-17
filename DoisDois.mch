@@ -8,10 +8,11 @@ VARIABLES
     contas, cartoes, faturas, transacoes, saldoCorrente, saldoPoupanca, 
     origemTransacoes, destinoTransacoes, valorTransacoes, limite, titular,
     tipoCartao, bloqueados, faturaAtual, statusFatura, totalFatura, faturaCartao, 
-    faturaOrdem, tipoTransacoes, limiteMax
+    faturaOrdem, tipoTransacoes, limiteMax, contasRemovidas
     
 INVARIANT
     contas <: CONTA &
+    contasRemovidas <: CONTA & 
     cartoes <: CARTAO &
     faturas <: FATURA &
     transacoes <: TRANSACAO &
@@ -39,7 +40,9 @@ INVARIANT
          & titular(c1) = titular(c2) & tipoCartao(c1) = tipoCartao(c2) => c1 = c2 ) &
     !ct.(ct : creditos => (ordensFaturas(ct) = 0 .. (card( faturaCartao~[{ct}] ) - 1 ))) &
     (faturaAtual;faturaCartao) = id(creditos) &
-    !ct.(ct : creditos => limite(ct) <= limiteMax(ct))
+    !ct.(ct : creditos => limite(ct) <= limiteMax(ct)) &
+    
+    contas /\ contasRemovidas = {}
 
 DEFINITIONS     
     creditos == tipoCartao~[{credito}];    
@@ -53,10 +56,11 @@ DEFINITIONS
     ordensFaturas(ct) == ran(faturaCartao~[{ct}] <| faturaOrdem);
     transacoesDuplicadas(cc) == 
         (( origemTransacoes~[{cc}] /\ tipoTransacoes~[{depositoCorrente}] ) - destinoTransacoes~[{cc}])
-        \/ (( destinoTransacoes~[{cc}] /\ tipoTransacoes~[{tranCredito}] ) - origemTransacoes~[{cc}])
+        \/ (( destinoTransacoes~[{cc}] /\ tipoTransacoes~[{tranCredito}] ) - origemTransacoes~[{cc}]);
+    conjuntoHistorico == (origemTransacoes~[{cc}] \/ destinoTransacoes~[{cc}]) - transacoesDuplicadas(cc)
 
 INITIALISATION
-    contas := {} || cartoes := {} || faturas := {} || 
+    contas := {} || contasRemovidas := {} || cartoes := {} || faturas := {} || 
     transacoes := {} || saldoCorrente := {} || saldoPoupanca := {} || 
     origemTransacoes := {} || destinoTransacoes := {} ||  valorTransacoes := {} ||
     limite := {} || titular := {} || tipoCartao := {} || bloqueados := {} ||
@@ -69,13 +73,50 @@ OPERATIONS
 adicionarConta(cc) =
     PRE
         cc : CONTA &
-        cc /: contas 
+        cc /: contas &
+        cc /: contasRemovidas
     THEN
         contas := contas \/ {cc} ||
-        saldoCorrente := saldoCorrente \/ {cc |-> 0} ||
-        saldoPoupanca := saldoPoupanca \/ {cc |-> 0} 
+        saldoCorrente(cc) := 0 ||
+        saldoPoupanca(cc) := 0 
     END;
 
+depositarCorrente(cc, valor) =
+    PRE
+        cc : CONTA & cc : contas & valor : NAT & saldoCorrente(cc) + valor : NAT
+    THEN
+        saldoCorrente(cc) := saldoCorrente(cc) + valor ||
+        ANY
+            tt
+        WHERE
+            tt : TRANSACAO & tt /: transacoes
+        THEN
+            transacoes := transacoes \/ {tt} ||
+            origemTransacoes(tt) := cc ||
+            destinoTransacoes(tt) := cc ||
+            valorTransacoes(tt) := valor ||
+            tipoTransacoes(tt) := depositoCorrente
+        END
+    END;
+
+depositarPoupanca(cc, valor) =
+    PRE
+        cc : CONTA & cc : contas & valor : NAT & saldoPoupanca(cc) + valor : NAT
+    THEN
+        saldoPoupanca(cc) := saldoPoupanca(cc) + valor ||
+        ANY
+            tt
+        WHERE
+            tt : TRANSACAO & tt /: transacoes
+        THEN
+            transacoes := transacoes \/ {tt} ||
+            origemTransacoes(tt) := cc ||
+            destinoTransacoes(tt) := cc ||
+            valorTransacoes(tt) := valor ||
+            tipoTransacoes(tt) := depositoPoupanca
+        END
+    END;
+        
 sacarCorrente(cc, valor) =
     PRE 
         cc : CONTA & cc: contas & valor : 1..saldoCorrente(cc)
@@ -154,18 +195,14 @@ removerCartao(ct) =
         BE 
             faturasCartao = faturaCartao~[{ct}] 
         IN
-            IF 
-                ct : creditos
-            THEN 
-                limite := {ct} <<| limite ||
-                limiteMax := {ct} <<| limiteMax ||
-                faturas := faturas - faturasCartao ||
-                statusFatura := faturasCartao <<| statusFatura ||
-                totalFatura := faturasCartao <<| totalFatura ||
-                faturaCartao := faturasCartao <<| faturaCartao ||
-                faturaOrdem := faturasCartao <<| faturaOrdem ||
-                faturaAtual := {ct} <<| faturaAtual 
-            END
+            limite := {ct} <<| limite ||
+            limiteMax := {ct} <<| limiteMax ||
+            faturas := faturas - faturasCartao ||
+            statusFatura := faturasCartao <<| statusFatura ||
+            totalFatura := faturasCartao <<| totalFatura ||
+            faturaCartao := faturasCartao <<| faturaCartao ||
+            faturaOrdem := faturasCartao <<| faturaOrdem ||
+            faturaAtual := {ct} <<| faturaAtual 
         END
      END;
      
@@ -227,12 +264,38 @@ compraParcelada(origem, destino, valor, parcelas) =
        END 
     END;
     
+realizarTranscao(co, cd, valor) =
+    PRE
+        co : CONTA & cd : CONTA &
+        co : contas & cd : contas & valor : 1..saldoCorrente(co) & saldoCorrente(cd) + valor : NAT &
+        co /= cd
+    THEN
+        saldoCorrente := saldoCorrente <+ {co |-> saldoCorrente(co) - valor, cd |-> saldoCorrente(cd) + valor} ||
+        ANY
+            tt
+        WHERE
+            tt : TRANSACAO & tt /: transacoes
+        THEN
+            transacoes := transacoes \/ {tt} ||
+            origemTransacoes(tt) := co ||
+            destinoTransacoes(tt) := cd ||
+            valorTransacoes(tt) := valor ||
+            tipoTransacoes(tt) := tranDebito
+        END
+    END;
+    
 
 hh <-- historico(cc) = 
    PRE 
        cc : CONTA & cc : contas
    THEN
-      hh := (origemTransacoes~[{cc}] \/ destinoTransacoes~[{cc}]) - transacoesDuplicadas(cc)
+      ANY hhList
+      WHERE
+          hhList : 0..card(conjuntoHistorico)-1 +-> TRANSACAO &
+          ran(hhList) = conjuntoHistorico
+      THEN
+          hh := hhList
+      END
    END;
    
 sc, sp <-- consultarSaldos(cc) = 
@@ -274,12 +337,26 @@ atualizarLimite(ct, valor) =
     THEN
       limite(ct) := valor
     END;
+
+vf <-- consultarValorFatura(ct) =
+    PRE
+        ct : CARTAO & ct : creditos
+    THEN
+        vf := totalFatura(faturaAtual(ct))
+    END;
     
 ctConta <-- consultarCartoesConta(cc) = 
     PRE 
         cc : CONTA & cc : contas
     THEN
-        ctConta := titular~[{cc}]
+        ANY ctContaList
+        WHERE
+            titular~[{cc}]: FIN(titular~[{cc}]) &
+            ctContaList : 0..card(titular~[{cc}])-1 +-> CARTAO &
+            ran(ctContaList) = titular~[{cc}]
+        THEN
+            ctConta := ctContaList    
+        END
     END;
     
 ll <-- consultarLimite(ct) = 
@@ -307,15 +384,43 @@ oo, dd, vv, tp <-- consultarTransacao(tt) =
 removerConta(cc) = 
     PRE
         cc : CONTA &
-        cc : contas
+        cc : contas &
+        cc /: contasRemovidas &
+        !ct . ((ct : creditos & titular(ct) = cc) => (faturaCartao~[{ct}] <: statusFatura~[{paga}] \/ totalFatura~[{0}]))
     THEN
+        LET
+            cts
+        BE
+            cts = titular~[{cc}]
+        IN
+            cartoes := cartoes - cts ||
+            bloqueados := cartoes - cts ||
+            tipoCartao := cts <<| tipoCartao ||
+            titular := titular |>> {cc} ||
+            LET 
+                faturasCartao 
+            BE 
+                faturasCartao = faturaCartao~[cts] 
+            IN
+                limite := cts <<| limite ||
+                limiteMax := cts <<| limiteMax ||
+                faturas := faturas - faturasCartao ||
+                statusFatura := faturasCartao <<| statusFatura ||
+                totalFatura := faturasCartao <<| totalFatura ||
+                faturaCartao := faturasCartao <<| faturaCartao ||
+                faturaOrdem := faturasCartao <<| faturaOrdem ||
+                faturaAtual := cts <<| faturaAtual 
+                
+            END
+        END ||
         contas := contas - {cc} ||
-        cartoes := cartoes - titular~[{cc}] ||
-        limite := titular~[{cc}] <<| limite ||
         saldoCorrente := {cc} <<| saldoCorrente ||
         saldoPoupanca := {cc} <<| saldoPoupanca ||
-        titular := titular |>> {cc}
-    END
+        contasRemovidas := contasRemovidas \/ {cc}
+    END;
+    
+
+passarTempo = skip
 
 END
 
