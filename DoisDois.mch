@@ -78,7 +78,7 @@ adicionarConta(cc) =
 
 sacarCorrente(cc, valor) =
     PRE 
-        cc: contas & valor : 1..saldoCorrente(cc)
+        cc : CONTA & cc: contas & valor : 1..saldoCorrente(cc)
     THEN 
         saldoCorrente(cc) := saldoCorrente(cc) - valor ||
         ANY 
@@ -96,7 +96,7 @@ sacarCorrente(cc, valor) =
 
 sacarPoupanca(cc, valor) =
     PRE
-        cc : contas & valor : 1..saldoPoupanca(cc) & saldoCorrente(cc) + valor : NAT
+        cc : CONTA & cc : contas & valor : 1..saldoPoupanca(cc) & saldoCorrente(cc) + valor : NAT
     THEN
         saldoPoupanca(cc) := saldoPoupanca(cc) - valor ||
         saldoCorrente(cc) := saldoCorrente(cc) + valor ||
@@ -115,7 +115,8 @@ sacarPoupanca(cc, valor) =
 
 adicionarCartao(ct, tp, cc) =
     PRE
-        ct : CARTAO & ct /: cartoes & tp : TIPOCARTAO & cc : contas & tipoCartao~[{tp}] /\ titular~[{cc}] = {}
+        ct : CARTAO & ct /: cartoes & tp : TIPOCARTAO & cc : CONTA & 
+        cc : contas & tipoCartao~[{tp}] /\ titular~[{cc}] = {}
     THEN
         cartoes := cartoes \/ {ct} ||
         tipoCartao(ct) := tp ||
@@ -142,7 +143,7 @@ adicionarCartao(ct, tp, cc) =
     
 removerCartao(ct) =
     PRE
-        ct : cartoes & ((tipoCartao(ct) = credito) => (faturaCartao~[{ct}] <: statusFatura~[{paga}] \/ totalFatura~[{0}]))
+        ct : CARTAO & ct : cartoes & ((tipoCartao(ct) = credito) => (faturaCartao~[{ct}] <: statusFatura~[{paga}] \/ totalFatura~[{0}]))
     THEN
         cartoes := cartoes - {ct} ||
         bloqueados := cartoes - {ct} ||
@@ -170,7 +171,8 @@ removerCartao(ct) =
      
 pagarFatura(cc, ff) = 
     PRE 
-        cc : contas & ff : faturas & statusFatura(ff) /= paga & 
+        cc : CONTA & cc : contas & 
+        ff : FATURA & ff : faturas & statusFatura(ff) /= paga & 
         totalFatura(ff) > 0 & saldoCorrente(cc) >= totalFatura(ff)
     THEN
         saldoCorrente(cc) := saldoCorrente(cc) - totalFatura(ff) ||
@@ -178,7 +180,8 @@ pagarFatura(cc, ff) =
     END;
     
 compraParcelada(origem, destino, valor, parcelas) =
-    PRE origem : cartoes & origem : creditos & destino : contas & 
+    PRE origem : CARTAO & destino : CONTA &
+        origem : cartoes & origem : creditos & destino : contas & 
         titular(origem) /= destino & 
         valor : NAT1 & parcelas : 1..maxParcelas & 
         (valor mod parcelas) = 0 &
@@ -227,35 +230,35 @@ compraParcelada(origem, destino, valor, parcelas) =
 
 hh <-- historico(cc) = 
    PRE 
-       cc : contas
+       cc : CONTA & cc : contas
    THEN
       hh := (origemTransacoes~[{cc}] \/ destinoTransacoes~[{cc}]) - transacoesDuplicadas(cc)
    END;
    
 sc, sp <-- consultarSaldos(cc) = 
     PRE 
-        cc : contas
+        cc : CONTA & cc : contas
     THEN
         sc := saldoCorrente(cc) || sp := saldoPoupanca(cc)
     END;
 
 bloquearCartao(ct) =
     PRE 
-        ct : cartoes & ct /: bloqueados
+        ct : CARTAO & ct : cartoes & ct /: bloqueados
     THEN 
         bloqueados := bloqueados \/ {ct}
     END;
 
 desbloquearCartao(ct) = 
     PRE 
-        ct : cartoes & ct : bloqueados
+        ct : CARTAO & ct : cartoes & ct : bloqueados
     THEN
        bloqueados := bloqueados - {ct}
     END;
     
 atualizarLimiteMax(ct, valor) =
     PRE 
-        ct: creditos & ct /: bloqueados & valor : NAT
+        ct : CARTAO & ct: creditos & ct /: bloqueados & valor : NAT
     THEN
         limiteMax(ct) := valor ||
         IF 
@@ -267,39 +270,39 @@ atualizarLimiteMax(ct, valor) =
     
 atualizarLimite(ct, valor) = 
     PRE 
-      ct : creditos & ct /: bloqueados & valor : 0..limiteMax(ct)
+      ct : CARTAO & ct : creditos & ct /: bloqueados & valor : 0..limiteMax(ct)
     THEN
       limite(ct) := valor
     END;
     
 ctConta <-- consultarCartoesConta(cc) = 
     PRE 
-        cc : contas
+        cc : CONTA & cc : contas
     THEN
         ctConta := titular~[{cc}]
     END;
     
 ll <-- consultarLimite(ct) = 
     PRE
-        ct : creditos
+        ct : CARTAO & ct : creditos
     THEN
         ll := limite(ct)
     END;
 
 lm <-- consultarLimiteMax(ct) = 
     PRE
-        ct : creditos
+        ct : CARTAO & ct : creditos
     THEN
         lm := limiteMax(ct)
     END;
     
 oo, dd, vv, tp <-- consultarTransacao(tt) = 
     PRE
-        tt : transacoes
+        tt : TRANSACAO & tt : transacoes
     THEN
         oo := origemTransacoes(tt) || dd := destinoTransacoes(tt) || 
         vv := valorTransacoes(tt) || tp := tipoTransacoes(tt)
-    END;  
+    END;
 
 removerConta(cc) = 
     PRE
