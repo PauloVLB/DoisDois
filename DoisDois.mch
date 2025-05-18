@@ -417,6 +417,50 @@ removerConta(cc) =
         saldoPoupanca := {cc} <<| saldoPoupanca ||
         contasRemovidas := contasRemovidas \/ {cc}
     END;
+
+ccs <-- consultarContas = 
+    ANY ccList
+    WHERE
+          ccList : 0..card(contas)-1 +-> CONTA &
+          ran(ccList) = contas
+    THEN
+          ccs := ccList
+    END;
+    
+ftCartao <-- consultarFaturasCartao(ct) = 
+    PRE 
+        ct : CARTAO & ct : cartoes & faturaCartao~[{ct}] : FIN(faturaCartao~[{ct}])
+    THEN
+        ANY ffList
+        WHERE
+              ffList : 0..card(faturaCartao~[{ct}])-1 +-> FATURA &
+              ran(ffList) = faturaCartao~[{ct}]
+        THEN
+              ftCartao := ffList
+        END
+    END;
+
+ct, tt, oo, st, atual <-- consultarFatura(ff) =
+    PRE 
+        ff : FATURA & ff : faturas
+    THEN
+        tt := totalFatura(ff) ||
+        oo := faturaOrdem(ff) || st := statusFatura(ff) ||
+        ANY 
+            cartao 
+        WHERE 
+            cartao : CARTAO & cartao : cartoes & cartao = faturaCartao(ff)
+        THEN
+            ct := cartao ||
+            IF 
+                faturaAtual(cartao) = ff
+            THEN
+                atual := TRUE
+            ELSE
+                atual := FALSE
+            END
+        END
+    END;
     
 
 passarTempo = skip
