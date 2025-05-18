@@ -30,7 +30,7 @@ INVARIANT
     bloqueados <: cartoes &
     statusFatura : faturas --> STATUSFATURA &
     totalFatura : faturas --> NAT &
-    faturaCartao: faturas -->> creditos &
+    faturaCartao: faturas --> creditos &
     faturaOrdem : faturas --> NAT &
     faturaAtual : creditos >-> faturas &
     
@@ -52,7 +52,6 @@ DEFINITIONS
     faturasExistentes(ct, parcelas) == 
         { fe | fe : faturas & faturaCartao(fe) = ct &
                               faturaOrdem(fe) : (ordemAtual(ct) .. (ordemAtual(ct) + parcelas - 1))};
-    limiteValido(ct, valor, ff) == (totalFatura(ff) + valor <= limite(ct));
     ordensFaturas(ct) == ran(faturaCartao~[{ct}] <| faturaOrdem);
     transacoesDuplicadas(cc) == 
         (( origemTransacoes~[{cc}] /\ tipoTransacoes~[{depositoCorrente}] ) - destinoTransacoes~[{cc}])
@@ -223,9 +222,7 @@ compraParcelada(origem, destino, valor, parcelas) =
         valor : NAT1 & parcelas : 1..maxParcelas & 
         (valor mod parcelas) = 0 &
         origem /: bloqueados &
-        (valor / parcelas) <= limite(origem) &
-        !ff.(ff : faturasExistentes(origem, parcelas) => 
-            (limiteValido(origem, (valor / parcelas), ff)))
+        (valor / parcelas) <= limite(origem) 
     THEN
        LET 
            ordensAusentes, parcela
@@ -254,12 +251,14 @@ compraParcelada(origem, destino, valor, parcelas) =
                valorTransacoes := valorTransacoes \/ {tDestino |-> valor} \/ (tOrigem * {parcela}) ||
                tipoTransacoes := tipoTransacoes \/ {tDestino |-> depositoCorrente} \/ (tOrigem * {tranCredito})  ||
                saldoCorrente(destino) := saldoCorrente(destino) + valor ||
+               
+               limite(origem) := limite(origem) - parcela ||
                /*criar faturas novas*/
                faturas := faturas \/ novasFaturas ||
                statusFatura := statusFatura \/ (novasFaturas * {aberta}) ||
                faturaCartao := faturaCartao \/ (novasFaturas * {origem}) ||
                faturaOrdem := faturaOrdem \/ novaOrdem ||
-               totalFatura := totalFatura <+ (%ff.(ff : faturasExistentes(origem, parcelas) | totalFatura(ff) + parcela) \/  (novasFaturas * {parcela})) 
+               totalFatura := totalFatura <+ (%ff.(ff : faturasExistentes(origem, parcelas) | totalFatura(ff) + parcela) \/  (novasFaturas * {parcela}))  
            END 
        END 
     END;
