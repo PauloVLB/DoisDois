@@ -16,6 +16,7 @@ INVARIANT
     cartoes <: CARTAO &
     faturas <: FATURA &
     transacoes <: TRANSACAO &
+    contas : FIN(contas) &
     saldoCorrente : contas --> NAT &
     saldoPoupanca : contas --> NAT &
     origemTransacoes : transacoes --> CONTA &
