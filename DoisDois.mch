@@ -57,7 +57,8 @@ DEFINITIONS
     transacoesDuplicadas(cc) == 
         (( origemTransacoes~[{cc}] /\ tipoTransacoes~[{depositoCorrente}] ) - destinoTransacoes~[{cc}])
         \/ (( destinoTransacoes~[{cc}] /\ tipoTransacoes~[{tranCredito}] ) - origemTransacoes~[{cc}]);
-    conjuntoHistorico == (origemTransacoes~[{cc}] \/ destinoTransacoes~[{cc}]) - transacoesDuplicadas(cc)
+    conjuntoHistorico == (origemTransacoes~[{cc}] \/ destinoTransacoes~[{cc}]) - transacoesDuplicadas(cc);
+    maisUm == %xx.(xx : NAT | xx + 1)
 
 INITIALISATION
     contas := {} || contasRemovidas := {} || cartoes := {} || faturas := {} || 
@@ -210,7 +211,8 @@ pagarFatura(cc, ff) =
     PRE 
         cc : CONTA & cc : contas & 
         ff : FATURA & ff : faturas & statusFatura(ff) /= paga & 
-        totalFatura(ff) > 0 & saldoCorrente(cc) >= totalFatura(ff)
+        totalFatura(ff) > 0 & saldoCorrente(cc) >= totalFatura(ff) &
+        titular(faturaCartao(ff)) = cc
     THEN
         saldoCorrente(cc) := saldoCorrente(cc) - totalFatura(ff) ||
         statusFatura(ff) := paga 
@@ -464,7 +466,74 @@ ct, tt, oo, st, atual <-- consultarFatura(ff) =
     END;
     
 
-passarTempo = skip
+/*
+tem que atualizar:
+OK saldoPoupanca
+OK statusFatura : faturas --> STATUSFATURA &
+OK totalFatura : faturas --> NAT &
+
+Se o cartão já tem faturas futuras, setar a proxima fatura como faturaAtual.
+Se não tem, criar nova fatura pra ser a atual.
+    add em faturas
+    adicionar em faturaCartao
+    adicionar em faturaOrdem
+    setar como faturaAtual
+
+faturas <: FATURA &
+faturaCartao: faturas -->> creditos &
+faturaOrdem : faturas --> NAT &
+faturaAtual : creditos >-> faturas &
+*/
+
+passarTempo =
+    PRE
+        !cc.(cc : contas => saldoPoupanca(cc) * taxaRendimento : NAT) &
+        !ff.((ff : faturas & faturaOrdem(ff) <= faturaOrdem(faturaAtual(faturaCartao(ff))) & (statusFatura(ff) : {vencida, aberta})) 
+            => totalFatura(ff) * jurosFatura : NAT)
+    THEN
+        saldoPoupanca := %cc.(cc : contas | saldoPoupanca(cc) * taxaRendimento) ||
+        
+        ANY
+            cartoesComProximaFatura, cartoesSemProximaFatura, 
+            proximaFaturaExistente,
+            novasFaturas, faturaCartaoNovo, faturaOrdemNovo
+        WHERE
+            cartoesComProximaFatura = {ct | ct : creditos & faturaOrdem~[{faturaOrdem(faturaAtual(ct)) + 1}] /= {}} &
+            cartoesSemProximaFatura = {ct | ct : creditos & faturaOrdem~[{faturaOrdem(faturaAtual(ct)) + 1}] = {}} &
+            cartoesSemProximaFatura : FIN(cartoesSemProximaFatura) &
+            cartoesComProximaFatura : FIN(cartoesComProximaFatura) &
+            
+            novasFaturas <: FATURA - faturas & 
+            novasFaturas : FIN(novasFaturas) &
+            card(novasFaturas) = card(cartoesSemProximaFatura) &
+            
+            faturaCartaoNovo : novasFaturas >->> cartoesSemProximaFatura &
+            
+            faturaOrdemNovo : novasFaturas --> (maisUm)[faturaOrdem[faturaAtual[cartoesSemProximaFatura]]] &
+            
+            proximaFaturaExistente = {ct, ff | ct : creditos & 
+                                               ff : faturas & 
+                                               faturaOrdem(ff) = faturaOrdem(faturaAtual(ct)) + 1 &
+                                               faturaCartao(ff) = ct }
+        THEN
+            faturas := faturas \/ novasFaturas ||
+            faturaCartao := faturaCartao \/ faturaCartaoNovo ||
+            faturaOrdem := faturaOrdem \/ faturaOrdemNovo ||
+            faturaAtual := faturaAtual <+ 
+                            %ct.(ct : cartoesComProximaFatura | proximaFaturaExistente(ct)) <+
+                            %ct.(ct : cartoesSemProximaFatura | faturaCartaoNovo~(ct)) ||
+            statusFatura := statusFatura <+ 
+                        %ff.(ff : ran(faturaAtual) & statusFatura(ff) = aberta & totalFatura(ff) > 0 | vencida) <+
+                        %ff.(ff : ran(faturaAtual) & statusFatura(ff) = aberta & totalFatura(ff) = 0 | paga) \/
+                        novasFaturas * {aberta} ||
+            totalFatura := totalFatura <+ 
+                       %ff.(ff : faturas & faturaOrdem(ff) <= faturaOrdem(faturaAtual(faturaCartao(ff))) 
+                             & statusFatura(ff) : {vencida, aberta}
+                           | totalFatura(ff) * jurosFatura) \/ 
+                       novasFaturas * {0}
+        END
+        
+    END
 
 END
 
