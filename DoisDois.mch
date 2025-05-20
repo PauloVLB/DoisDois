@@ -225,9 +225,11 @@ compraParcelada(co, cd, valor, parcelas) =
         co : cartoes & co : creditos & cd : contas & 
         titular(co) /= cd & 
         valor : NAT1 & parcelas : 1..maxParcelas & 
-        (valor mod parcelas) = 0 &
+        (valor / parcelas) : NAT &
         co /: bloqueados &
-        (valor / parcelas) <= limite(co) 
+        (valor / parcelas) <= limite(co) &
+	saldoCorrente(cd) + valor : NAT  &
+        !ff.(ff : faturasExistentes(co, parcelas) => (totalFatura(ff) + parcela) : NAT)
     THEN
        LET 
            ordensAusentes, parcela
