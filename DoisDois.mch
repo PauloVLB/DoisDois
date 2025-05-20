@@ -57,7 +57,7 @@ DEFINITIONS
     
     transacoesDuplicadas(cc) == 
         (( origemTransacoes~[{cc}] /\ tipoTransacoes~[{depositoCorrente}] ) - destinoTransacoes~[{cc}])
-        \/ (( destinoTransacoes~[{cc}] /\ tipoTransacoes~[{tranCredito}] ) - origemTransacoes~[{cc}]);
+        \/ (( destinoTransacoes~[{cc}] /\ tipoTransacoes~[{tranCredito}] ));
     conjuntoHistorico(cc) == (origemTransacoes~[{cc}] \/ destinoTransacoes~[{cc}]) - transacoesDuplicadas(cc);
     
     maisUm == %xx.(xx : NAT | xx + 1)
