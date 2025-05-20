@@ -229,7 +229,7 @@ compraParcelada(co, cd, valor, parcelas) =
         co /: bloqueados &
         (valor / parcelas) <= limite(co) &
 	saldoCorrente(cd) + valor : NAT  &
-        !ff.(ff : faturasExistentes(co, parcelas) => (totalFatura(ff) + parcela) : NAT)
+        !ff.(ff : faturasExistentes(co, parcelas) => (totalFatura(ff) + valor/parcelas) : NAT)
     THEN
        LET 
            ordensAusentes, parcela
@@ -524,8 +524,12 @@ passarTempo =
             proximaFaturaExistente,
             novasFaturas, faturaCartaoNovo, faturaOrdemNovo
         WHERE
-            cartoesComProximaFatura = {ct | ct : creditos & faturaOrdem~[{faturaOrdem(faturaAtual(ct)) + 1}] /= {}} &
-            cartoesSemProximaFatura = {ct | ct : creditos & faturaOrdem~[{faturaOrdem(faturaAtual(ct)) + 1}] = {}} &
+            
+            // fatura1 fatura2
+            // 0 1
+            // 2
+            cartoesSemProximaFatura = {ct | ct : creditos & faturaOrdem(faturaAtual(ct)) = card(faturaCartao~[{ct}]) - 1} &
+            cartoesComProximaFatura = creditos - cartoesSemProximaFatura &
             cartoesSemProximaFatura : FIN(cartoesSemProximaFatura) &
             cartoesComProximaFatura : FIN(cartoesComProximaFatura) &
             
@@ -535,8 +539,10 @@ passarTempo =
             
             faturaCartaoNovo : novasFaturas >->> cartoesSemProximaFatura &
             
-            faturaOrdemNovo : novasFaturas --> (maisUm)[faturaOrdem[faturaAtual[cartoesSemProximaFatura]]] &
+            // faturaOrdemNovo : novasFaturas --> (maisUm)[faturaOrdem[faturaAtual[cartoesSemProximaFatura]]] &
             
+            faturaOrdemNovo = %ff.(ff : novasFaturas | faturaOrdem(faturaAtual(faturaCartaoNovo(ff))) + 1) &
+
             proximaFaturaExistente = {ct, ff | ct : creditos & 
                                                ff : faturas & 
                                                faturaOrdem(ff) = faturaOrdem(faturaAtual(ct)) + 1 &
@@ -546,8 +552,8 @@ passarTempo =
             faturaCartao := faturaCartao \/ faturaCartaoNovo ||
             faturaOrdem := faturaOrdem \/ faturaOrdemNovo ||
             faturaAtual := faturaAtual <+ 
-                            %ct.(ct : cartoesComProximaFatura | proximaFaturaExistente(ct)) <+
-                            %ct.(ct : cartoesSemProximaFatura | faturaCartaoNovo~(ct)) ||
+                            (%ct.(ct : cartoesComProximaFatura | proximaFaturaExistente(ct)) \/
+                            %ct.(ct : cartoesSemProximaFatura | faturaCartaoNovo~(ct))) ||
             statusFatura := statusFatura <+ 
                         %ff.(ff : ran(faturaAtual) & statusFatura(ff) = aberta & totalFatura(ff) > 0 | vencida) <+
                         %ff.(ff : ran(faturaAtual) & statusFatura(ff) = aberta & totalFatura(ff) = 0 | paga) \/
