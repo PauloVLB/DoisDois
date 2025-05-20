@@ -42,8 +42,10 @@ INVARIANT
     (faturaAtual;faturaCartao) = id(creditos) &
     !ct.(ct : creditos => limite(ct) <= limiteMax(ct)) &
     
+    !cts. (cts : creditos => SIGMA tt . (tt : transCredito & origemTransacoes(tt) = titular(cts) | valorTransacoes(tt)) = 
+                             SIGMA ff . (ff : faturas & faturaCartao(ff) = cts | totalFatura(ff) ) ) &
+    
     contas /\ contasRemovidas = {}
-
 DEFINITIONS     
     creditos == tipoCartao~[{credito}];       
     debitos == tipoCartao~[{debito}];    
@@ -58,9 +60,8 @@ DEFINITIONS
     transacoesDuplicadas(cc) == 
         (( origemTransacoes~[{cc}] /\ tipoTransacoes~[{depositoCorrente}] ) - destinoTransacoes~[{cc}])
         \/ (( destinoTransacoes~[{cc}] /\ tipoTransacoes~[{tranCredito}] ));
-    conjuntoHistorico(cc) == (origemTransacoes~[{cc}] \/ destinoTransacoes~[{cc}]) - transacoesDuplicadas(cc);
+    conjuntoHistorico(cc) == (origemTransacoes~[{cc}] \/ destinoTransacoes~[{cc}]) - transacoesDuplicadas(cc)
     
-    maisUm == %xx.(xx : NAT | xx + 1)
 
 INITIALISATION
     contas := {} || contasRemovidas := {} || cartoes := {} || faturas := {} || 
@@ -72,7 +73,7 @@ INITIALISATION
     limiteMax := {}
 
 OPERATIONS
-    
+
 adicionarConta(cc) =
     PRE
         cc : CONTA &
@@ -270,7 +271,7 @@ compraParcelada(co, cd, valor, parcelas) =
        END 
     END;
     
-realizarTransferencia(co, cd, valor) =
+pix(co, cd, valor) =
     PRE
         co : CONTA & cd : CONTA &
         co : contas & cd : contas & valor : 1..saldoCorrente(co) & saldoCorrente(cd) + valor : NAT &
@@ -492,24 +493,6 @@ ct, tt, oo, st, atual <-- consultarFatura(ff) =
     END;
     
 
-/*
-tem que atualizar:
-OK saldoPoupanca
-OK statusFatura : faturas --> STATUSFATURA &
-OK totalFatura : faturas --> NAT &
-
-Se o cartão já tem faturas futuras, setar a proxima fatura como faturaAtual.
-Se não tem, criar nova fatura pra ser a atual.
-    add em faturas
-    adicionar em faturaCartao
-    adicionar em faturaOrdem
-    setar como faturaAtual
-
-faturas <: FATURA &
-faturaCartao: faturas -->> creditos &
-faturaOrdem : faturas --> NAT &
-faturaAtual : creditos >-> faturas &
-*/
 
 passarTempo =
     PRE
@@ -524,10 +507,6 @@ passarTempo =
             proximaFaturaExistente,
             novasFaturas, faturaCartaoNovo, faturaOrdemNovo
         WHERE
-            
-            // fatura1 fatura2
-            // 0 1
-            // 2
             cartoesSemProximaFatura = {ct | ct : creditos & faturaOrdem(faturaAtual(ct)) = card(faturaCartao~[{ct}]) - 1} &
             cartoesComProximaFatura = creditos - cartoesSemProximaFatura &
             cartoesSemProximaFatura : FIN(cartoesSemProximaFatura) &
@@ -538,8 +517,6 @@ passarTempo =
             card(novasFaturas) = card(cartoesSemProximaFatura) &
             
             faturaCartaoNovo : novasFaturas >->> cartoesSemProximaFatura &
-            
-            // faturaOrdemNovo : novasFaturas --> (maisUm)[faturaOrdem[faturaAtual[cartoesSemProximaFatura]]] &
             
             faturaOrdemNovo = %ff.(ff : novasFaturas | faturaOrdem(faturaAtual(faturaCartaoNovo(ff))) + 1) &
 
@@ -552,7 +529,7 @@ passarTempo =
             faturaCartao := faturaCartao \/ faturaCartaoNovo ||
             faturaOrdem := faturaOrdem \/ faturaOrdemNovo ||
             faturaAtual := faturaAtual <+ 
-                            (%ct.(ct : cartoesComProximaFatura | proximaFaturaExistente(ct)) \/
+                           (%ct.(ct : cartoesComProximaFatura | proximaFaturaExistente(ct)) \/
                             %ct.(ct : cartoesSemProximaFatura | faturaCartaoNovo~(ct))) ||
             statusFatura := statusFatura <+ 
                         %ff.(ff : ran(faturaAtual) & statusFatura(ff) = aberta & totalFatura(ff) > 0 | vencida) <+
@@ -564,9 +541,7 @@ passarTempo =
                            | totalFatura(ff) * jurosFatura) \/ 
                        novasFaturas * {0}
         END
-        
     END
-
 END
 
 
