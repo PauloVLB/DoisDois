@@ -541,7 +541,424 @@ passarMes =
                            | totalFatura(ff) * jurosFatura) \/ 
                        novasFaturas * {0}
         END
+    END;
+
+ok <-- pre_adicionarConta(cc) =
+    PRE
+        cc : CONTA
+    THEN
+        IF 
+            cc /: contas &
+            cc /: contasRemovidas
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+        
+    END;
+
+ok <-- pre_depositarCorrente(cc, valor) =
+    PRE
+        cc : CONTA & valor : NAT
+    THEN
+        IF 
+          cc : contas & saldoCorrente(cc) + valor : NAT 
+	THEN
+            ok := TRUE
+        ELSE
+            ok := FALSE
+        END
+    END;
+
+ok <-- pre_depositarPoupanca(cc, valor) =
+    PRE
+        cc : CONTA & valor : NAT
+    THEN
+        IF 
+            cc : contas &
+            saldoPoupanca(cc) + valor : NAT
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+        
+    END;
+
+ok <-- pre_sacarCorrente(cc, valor) =
+    PRE
+        cc : CONTA & valor : NAT
+    THEN
+        IF 
+            cc : contas &
+            valor : 1..saldoCorrente(cc)
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+        
+    END;
+
+ok <-- pre_sacarPoupanca(cc, valor) =
+    PRE
+        cc : CONTA & valor : NAT
+    THEN
+        IF 
+            cc : contas &
+            valor : 1..saldoPoupanca(cc) &
+            saldoCorrente(cc) + valor : NAT
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+        
+    END;
+
+ok <-- pre_adicionarCartao(ct, tp, cc) =
+    PRE
+        ct : CARTAO & tp : TIPOCARTAO & cc : CONTA
+    THEN
+        IF 
+            ct /: cartoes &
+            cc : contas &
+            tipoCartao~[{tp}] /\ titular~[{cc}] = {}
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+        
+    END;
+
+ok <-- pre_removerCartao(ct) =
+    PRE
+        ct : CARTAO
+    THEN
+        IF 
+            ct : cartoes &
+            ((tipoCartao(ct) = credito) => 
+                (faturaCartao~[{ct}] <: statusFatura~[{paga}] \/ totalFatura~[{0}])
+            )
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+        
+    END;
+
+ok <-- pre_pagarFatura(cc, ff) =
+    PRE
+        cc : CONTA & ff : FATURA
+    THEN
+        IF 
+            cc : contas &
+            ff : faturas &
+            statusFatura(ff) /= paga &
+            totalFatura(ff) > 0 &
+            saldoCorrente(cc) >= totalFatura(ff) &
+            titular(faturaCartao(ff)) = cc
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+
+    END;
+
+ok <-- pre_compraParcelada(co, cd, valor, parcelas) =
+    PRE
+        co : CARTAO & cd : CONTA & valor : NAT & parcelas : NAT
+    THEN
+        IF 
+            co : cartoes &
+            co : creditos &
+            cd : contas &
+            titular(co) /= cd &
+            valor : NAT1 &
+            parcelas : 1..maxParcelas &
+            (valor / parcelas) : NAT &
+            co /: bloqueados &
+            (valor / parcelas) <= limite(co) &
+            saldoCorrente(cd) + valor : NAT &
+            !ff.(ff : faturasExistentes(co, parcelas) => (totalFatura(ff) + valor/parcelas) : NAT)
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+
+    END;
+
+ok <-- pre_pix(co, cd, valor) =
+    PRE
+        co : CONTA & cd : CONTA & valor : NAT
+    THEN
+        IF 
+            co : contas &
+            cd : contas &
+            valor : 1..saldoCorrente(co) &
+            saldoCorrente(cd) + valor : NAT &
+            co /= cd
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+
+    END;
+
+ok <-- pre_compraDebito(co, cd, valor) =
+    PRE
+        co : CARTAO & cd : CONTA & valor : NAT
+    THEN
+        IF 
+            co : debitos &
+            co /: bloqueados &
+            cd : contas &
+            valor : 1..saldoCorrente(titular(co)) &
+            saldoCorrente(cd) + valor : NAT &
+            titular(co) /= cd
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+
+    END;
+
+ok <-- pre_historico(cc) =
+    PRE
+        cc : CONTA
+    THEN
+        IF 
+            cc : contas
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+
+    END;
+
+ok <-- pre_consultarSaldos(cc) =
+    PRE
+        cc : CONTA
+    THEN
+        IF 
+            cc : contas
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+
+    END;
+
+ok <-- pre_bloquearCartao(ct) =
+    PRE
+        ct : CARTAO
+    THEN
+        IF 
+            ct : cartoes &
+            ct /: bloqueados
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+
+    END;
+
+ok <-- pre_desbloquearCartao(ct) =
+    PRE
+        ct : CARTAO
+    THEN
+        IF 
+            ct : cartoes &
+            ct : bloqueados
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+
+    END;
+
+ok <-- pre_atualizarLimiteMax(ct, valor) =
+    PRE
+        ct : CARTAO & valor : NAT
+    THEN
+        IF 
+            ct : creditos &
+            ct /: bloqueados
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+
+    END;
+
+ok <-- pre_atualizarLimite(ct, valor) =
+    PRE
+        ct : CARTAO & valor : NAT
+    THEN
+        IF 
+            ct : creditos &
+            ct /: bloqueados &
+            valor : 0..limiteMax(ct)
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+
+    END;
+
+ok <-- pre_consultarValorFatura(ct) =
+    PRE
+        ct : CARTAO
+    THEN
+        IF 
+            ct : creditos
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+
+    END;
+
+ok <-- pre_consultarCartoesConta(cc) =
+    PRE
+        cc : CONTA
+    THEN
+        IF 
+            cc : contas
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+
+    END;
+ok <-- pre_consultarLimite(ct) =
+    PRE
+        ct : CARTAO
+    THEN
+        IF 
+            ct : creditos
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+
+    END;
+
+ok <-- pre_consultarLimiteMax(ct) =
+    PRE
+        ct : CARTAO
+    THEN
+        IF 
+            ct : creditos
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+
+    END;
+
+ok <-- pre_consultarTransacao(tt) =
+    PRE
+        tt : TRANSACAO
+    THEN
+        IF 
+            tt : transacoes
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+
+    END;
+
+ok <-- pre_removerConta(cc) =
+    PRE
+        cc : CONTA
+    THEN
+        IF 
+            cc : contas &
+            cc /: contasRemovidas &
+            !ct.((ct : creditos & titular(ct) = cc) =>
+                (faturaCartao~[{ct}] <: statusFatura~[{paga}] \/ totalFatura~[{0}]))
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+
+    END;
+
+ok <-- pre_consultarFaturasCartao(ct) =
+    PRE
+        ct : CARTAO
+    THEN
+        IF 
+            ct : cartoes &
+            faturaCartao~[{ct}] : FIN(faturaCartao~[{ct}])
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+
+    END;
+
+ok <-- pre_consultarContas =
+    PRE
+        1=1
+    THEN
+        ok := TRUE
+    END;
+
+
+ok <-- pre_consultarFatura(ff) =
+    PRE
+        ff : FATURA
+    THEN
+        IF 
+            ff : faturas
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+
+    END;
+
+ok <-- pre_passarMes =
+    PRE
+        1=1
+    THEN
+        IF 
+            !cc.(cc : contas => saldoPoupanca(cc) * taxaRendimento : NAT) &
+            !ff.((ff : faturas & faturaOrdem(ff) <= faturaOrdem(faturaAtual(faturaCartao(ff))) &
+                  (statusFatura(ff) : {vencida, aberta})) => 
+                  totalFatura(ff) * jurosFatura : NAT)
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
+
     END
+
 END
 
 
