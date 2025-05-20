@@ -920,13 +920,7 @@ ok <-- pre_consultarFaturasCartao(ct) =
 
     END;
 
-ok <-- pre_consultarContas =
-    PRE
-        1=1
-    THEN
-        ok := TRUE
-    END;
-
+ok <-- pre_consultarContas = ok := TRUE;
 
 ok <-- pre_consultarFatura(ff) =
     PRE
@@ -943,9 +937,6 @@ ok <-- pre_consultarFatura(ff) =
     END;
 
 ok <-- pre_passarMes =
-    PRE
-        1=1
-    THEN
         IF 
             !cc.(cc : contas => saldoPoupanca(cc) * taxaRendimento : NAT) &
             !ff.((ff : faturas & faturaOrdem(ff) <= faturaOrdem(faturaAtual(faturaCartao(ff))) &
@@ -956,8 +947,6 @@ ok <-- pre_passarMes =
         ELSE
             ok := FALSE
         END
-
-    END
 
 END
 
