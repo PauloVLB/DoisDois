@@ -5,7 +5,7 @@ SETS
     CONTA; FATURA; CARTAO; TRANSACAO;
     STATUSFATURA = {paga, vencida, aberta};
     TIPOCARTAO = {credito, debito};
-    TIPOTRANSACAO = {saqueCorrente, saquePoupanca, depositoCorrente, depositoPoupanca, tranCredito, tranDebito, transferencia}
+    TIPOTRANSACAO = {saqueCorrente, saquePoupanca, depositoCorrente, depositoPoupanca, tranCredito, tranDebito, tranPix}
 
 CONSTANTS         
     taxaRendimento, jurosFatura, maxParcelas, limiteMaxPadrao    

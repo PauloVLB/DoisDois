@@ -287,7 +287,7 @@ pix(co, cd, valor) =
             origemTransacoes(tt) := co ||
             destinoTransacoes(tt) := cd ||
             valorTransacoes(tt) := valor ||
-            tipoTransacoes(tt) := transferencia
+            tipoTransacoes(tt) := tranPix
         END
     END;
     
