@@ -494,7 +494,7 @@ ct, tt, oo, st, atual <-- consultarFatura(ff) =
     
 
 
-passarTempo =
+passarMes =
     PRE
         !cc.(cc : contas => saldoPoupanca(cc) * taxaRendimento : NAT) &
         !ff.((ff : faturas & faturaOrdem(ff) <= faturaOrdem(faturaAtual(faturaCartao(ff))) & (statusFatura(ff) : {vencida, aberta})) 
