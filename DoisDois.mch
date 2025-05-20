@@ -11,12 +11,11 @@ VARIABLES
     faturaOrdem, tipoTransacoes, limiteMax, contasRemovidas
     
 INVARIANT
-    contas <: CONTA &
-    contasRemovidas <: CONTA & 
-    cartoes <: CARTAO &
-    faturas <: FATURA &
-    transacoes <: TRANSACAO &
-    contas : FIN(contas) &
+    contas <: CONTA & contas : FIN(contas) &
+    contasRemovidas <: CONTA & contasRemovidas : FIN(contasRemovidas) &
+    cartoes <: CARTAO & cartoes : FIN(cartoes) &
+    faturas <: FATURA & faturas : FIN(faturas) &
+    transacoes <: TRANSACAO & transacoes : FIN(transacoes) &
     saldoCorrente : contas --> NAT &
     saldoPoupanca : contas --> NAT &
     origemTransacoes : transacoes --> CONTA &
@@ -46,7 +45,8 @@ INVARIANT
     contas /\ contasRemovidas = {}
 
 DEFINITIONS     
-    creditos == tipoCartao~[{credito}];    
+    creditos == tipoCartao~[{credito}];       
+    debitos == tipoCartao~[{debito}];    
     transCredito == tipoTransacoes~[{tranCredito}];
     ordemAtual(ct) == faturaOrdem(faturaAtual(ct));      
     /* faturas que receberão parcelas */
@@ -54,10 +54,12 @@ DEFINITIONS
         { fe | fe : faturas & faturaCartao(fe) = ct &
                               faturaOrdem(fe) : (ordemAtual(ct) .. (ordemAtual(ct) + parcelas - 1))};
     ordensFaturas(ct) == ran(faturaCartao~[{ct}] <| faturaOrdem);
+    
     transacoesDuplicadas(cc) == 
         (( origemTransacoes~[{cc}] /\ tipoTransacoes~[{depositoCorrente}] ) - destinoTransacoes~[{cc}])
         \/ (( destinoTransacoes~[{cc}] /\ tipoTransacoes~[{tranCredito}] ) - origemTransacoes~[{cc}]);
-    conjuntoHistorico == (origemTransacoes~[{cc}] \/ destinoTransacoes~[{cc}]) - transacoesDuplicadas(cc);
+    conjuntoHistorico(cc) == (origemTransacoes~[{cc}] \/ destinoTransacoes~[{cc}]) - transacoesDuplicadas(cc);
+    
     maisUm == %xx.(xx : NAT | xx + 1)
 
 INITIALISATION
@@ -218,21 +220,21 @@ pagarFatura(cc, ff) =
         statusFatura(ff) := paga 
     END;
     
-compraParcelada(origem, destino, valor, parcelas) =
-    PRE origem : CARTAO & destino : CONTA &
-        origem : cartoes & origem : creditos & destino : contas & 
-        titular(origem) /= destino & 
+compraParcelada(co, cd, valor, parcelas) =
+    PRE co : CARTAO & cd : CONTA &
+        co : cartoes & co : creditos & cd : contas & 
+        titular(co) /= cd & 
         valor : NAT1 & parcelas : 1..maxParcelas & 
         (valor mod parcelas) = 0 &
-        origem /: bloqueados &
-        (valor / parcelas) <= limite(origem) 
+        co /: bloqueados &
+        (valor / parcelas) <= limite(co) 
     THEN
        LET 
            ordensAusentes, parcela
        BE 
            /*ordensAusentes = ordensNecessarias - ordensExistentes*/
-           ordensAusentes = (ordemAtual(origem) .. (ordemAtual(origem) + parcelas - 1)) - 
-                             faturaOrdem[faturasExistentes(origem, parcelas)] &
+           ordensAusentes = (ordemAtual(co) .. (ordemAtual(co) + parcelas - 1)) - 
+                             faturaOrdem[faturasExistentes(co, parcelas)] &
            parcela = (valor / parcelas)
        IN
            ANY 
@@ -249,24 +251,24 @@ compraParcelada(origem, destino, valor, parcelas) =
            THEN
                /*transações na conta de origem e destino*/
                transacoes := transacoes \/ {tDestino} \/ tOrigem ||
-               origemTransacoes := origemTransacoes \/ {tDestino |-> titular(origem)} \/ (tOrigem * {titular(origem)}) ||
-               destinoTransacoes := destinoTransacoes \/ {tDestino |-> destino} \/ (tOrigem * {destino}) ||
+               origemTransacoes := origemTransacoes \/ {tDestino |-> titular(co)} \/ (tOrigem * {titular(co)}) ||
+               destinoTransacoes := destinoTransacoes \/ {tDestino |-> cd} \/ (tOrigem * {cd}) ||
                valorTransacoes := valorTransacoes \/ {tDestino |-> valor} \/ (tOrigem * {parcela}) ||
                tipoTransacoes := tipoTransacoes \/ {tDestino |-> depositoCorrente} \/ (tOrigem * {tranCredito})  ||
-               saldoCorrente(destino) := saldoCorrente(destino) + valor ||
+               saldoCorrente(cd) := saldoCorrente(cd) + valor ||
                
-               limite(origem) := limite(origem) - parcela ||
+               limite(co) := limite(co) - parcela ||
                /*criar faturas novas*/
                faturas := faturas \/ novasFaturas ||
                statusFatura := statusFatura \/ (novasFaturas * {aberta}) ||
-               faturaCartao := faturaCartao \/ (novasFaturas * {origem}) ||
+               faturaCartao := faturaCartao \/ (novasFaturas * {co}) ||
                faturaOrdem := faturaOrdem \/ novaOrdem ||
-               totalFatura := totalFatura <+ (%ff.(ff : faturasExistentes(origem, parcelas) | totalFatura(ff) + parcela) \/  (novasFaturas * {parcela}))  
+               totalFatura := totalFatura <+ (%ff.(ff : faturasExistentes(co, parcelas) | totalFatura(ff) + parcela) \/  (novasFaturas * {parcela}))  
            END 
        END 
     END;
     
-realizarTranscao(co, cd, valor) =
+realizarTransferencia(co, cd, valor) =
     PRE
         co : CONTA & cd : CONTA &
         co : contas & cd : contas & valor : 1..saldoCorrente(co) & saldoCorrente(cd) + valor : NAT &
@@ -282,9 +284,30 @@ realizarTranscao(co, cd, valor) =
             origemTransacoes(tt) := co ||
             destinoTransacoes(tt) := cd ||
             valorTransacoes(tt) := valor ||
-            tipoTransacoes(tt) := tranDebito
+            tipoTransacoes(tt) := transferencia
         END
     END;
+    
+compraDebito(co, cd, valor) =
+    PRE
+        co : CARTAO & cd : CONTA &
+        co : debitos & co /: bloqueados &
+        cd : contas & valor : 1..saldoCorrente(titular(co)) & saldoCorrente(cd) + valor : NAT &
+        titular(co) /= cd
+    THEN
+       saldoCorrente := saldoCorrente <+ {titular(co) |-> saldoCorrente(titular(co)) - valor, cd |-> saldoCorrente(cd) + valor} ||
+        ANY
+            tt
+        WHERE
+            tt : TRANSACAO & tt /: transacoes
+        THEN
+            transacoes := transacoes \/ {tt} ||
+            origemTransacoes(tt) := titular(co) ||
+            destinoTransacoes(tt) := cd ||
+            valorTransacoes(tt) := valor ||
+            tipoTransacoes(tt) := tranDebito
+        END
+   END;
     
 
 hh <-- historico(cc) = 
@@ -293,12 +316,13 @@ hh <-- historico(cc) =
    THEN
       ANY hhList
       WHERE
-          hhList : 0..card(conjuntoHistorico)-1 +-> TRANSACAO &
-          ran(hhList) = conjuntoHistorico
+          hhList : 0..card(conjuntoHistorico(cc))-1 +-> TRANSACAO &
+          ran(hhList) = conjuntoHistorico(cc)
       THEN
           hh := hhList
       END
    END;
+   
    
 sc, sp <-- consultarSaldos(cc) = 
     PRE 
