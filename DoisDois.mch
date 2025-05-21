@@ -38,7 +38,7 @@ INVARIANT
         faturaOrdem(f1) /= faturaOrdem(f2)) &
     !(c1,c2).( c1 : cartoes & c2 : cartoes 
          & titular(c1) = titular(c2) & tipoCartao(c1) = tipoCartao(c2) => c1 = c2 ) &
-    !ct.(ct : creditos => (ordensFaturas(ct) = 0 .. (card( faturaCartao~[{ct}] ) - 1 ))) &
+    !ct.(ct : creditos => (ordensFaturas(ct) = 0 .. (card( faturaCartao |> {ct} ) - 1 ))) &
     (faturaAtual;faturaCartao) = id(creditos) &
     !ct.(ct : creditos => limite(ct) <= limiteMax(ct)) &
 
@@ -504,7 +504,7 @@ passarMes =
             proximaFaturaExistente,
             novasFaturas, faturaCartaoNovo, faturaOrdemNovo, ordensCartoesSemProxima
         WHERE
-            cartoesSemProximaFatura = {ct | ct : creditos & faturaOrdem(faturaAtual(ct)) = card(faturaCartao~[{ct}]) - 1} &
+            cartoesSemProximaFatura = {ct | ct : creditos & faturaOrdem(faturaAtual(ct)) = card(faturaCartao |> {ct}) - 1} &
             cartoesComProximaFatura = creditos - cartoesSemProximaFatura &
             cartoesSemProximaFatura : FIN(cartoesSemProximaFatura) &
             cartoesComProximaFatura : FIN(cartoesComProximaFatura) &
