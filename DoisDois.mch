@@ -41,10 +41,7 @@ INVARIANT
     !ct.(ct : creditos => (ordensFaturas(ct) = 0 .. (card( faturaCartao~[{ct}] ) - 1 ))) &
     (faturaAtual;faturaCartao) = id(creditos) &
     !ct.(ct : creditos => limite(ct) <= limiteMax(ct)) &
-    
-    !cts. (cts : creditos => SIGMA tt . (tt : transCredito & origemTransacoes(tt) = titular(cts) | valorTransacoes(tt)) = 
-                             SIGMA ff . (ff : faturas & faturaCartao(ff) = cts | totalFatura(ff) ) ) &
-    
+
     contas /\ contasRemovidas = {}
 DEFINITIONS     
     creditos == tipoCartao~[{credito}];       
@@ -505,7 +502,7 @@ passarMes =
         ANY
             cartoesComProximaFatura, cartoesSemProximaFatura, 
             proximaFaturaExistente,
-            novasFaturas, faturaCartaoNovo, faturaOrdemNovo
+            novasFaturas, faturaCartaoNovo, faturaOrdemNovo, ordensCartoesSemProxima
         WHERE
             cartoesSemProximaFatura = {ct | ct : creditos & faturaOrdem(faturaAtual(ct)) = card(faturaCartao~[{ct}]) - 1} &
             cartoesComProximaFatura = creditos - cartoesSemProximaFatura &
@@ -518,8 +515,11 @@ passarMes =
             
             faturaCartaoNovo : novasFaturas >->> cartoesSemProximaFatura &
             
-            faturaOrdemNovo = %ff.(ff : novasFaturas | faturaOrdem(faturaAtual(faturaCartaoNovo(ff))) + 1) &
-
+            ordensCartoesSemProxima = %ct.(ct : cartoesSemProximaFatura | faturaOrdem(faturaAtual(ct))) &
+            faturaOrdemNovo = %ff.(ff : novasFaturas | ordensCartoesSemProxima (faturaCartaoNovo(ff)) + 1) &
+            //faturaOrdemNovo = %ff.(ff : novasFaturas | faturaOrdem(faturaAtual(faturaCartaoNovo(ff))) + 1) &
+            //faturaOrdemNovo = %ff.(ff : novasFaturas | 12) &
+            
             proximaFaturaExistente = {ct, ff | ct : creditos & 
                                                ff : faturas & 
                                                faturaOrdem(ff) = faturaOrdem(faturaAtual(ct)) + 1 &
