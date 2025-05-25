@@ -70,12 +70,10 @@ DEFINITIONS
     debitos == tipoCartao~[{debito}];    
     transCredito == tipoTransacoes~[{tranCredito}];
     
-    ordemAtual(ct) == faturaOrdem(faturaAtual(ct));  
-    
     /* faturas que receberão parcelas */
     faturasExistentes(ct, parcelas) == 
         {fe | fe : faturas & faturaCartao(fe) = ct &
-                              faturaOrdem(fe) : (ordemAtual(ct) .. (ordemAtual(ct) + parcelas - 1))};
+                              faturaOrdem(fe) : (faturaOrdem(faturaAtual(ct)) .. (faturaOrdem(faturaAtual(ct)) + parcelas - 1))};
     
     transacoesDuplicadas(cc) == 
         (( origemTransacoes~[{cc}] /\ tipoTransacoes~[{depositoCorrente}] ) - destinoTransacoes~[{cc}])
