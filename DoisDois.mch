@@ -9,50 +9,73 @@ VARIABLES
     origemTransacoes, destinoTransacoes, valorTransacoes, limite, titular,
     tipoCartao, bloqueados, faturaAtual, statusFatura, totalFatura, faturaCartao, 
     faturaOrdem, tipoTransacoes, limiteMax, contasRemovidas
+
     
 INVARIANT
     contas <: CONTA & contas : FIN(contas) &
     contasRemovidas <: CONTA & contasRemovidas : FIN(contasRemovidas) &
     cartoes <: CARTAO & cartoes : FIN(cartoes) &
+    
     faturas <: FATURA & faturas : FIN(faturas) &
     transacoes <: TRANSACAO & transacoes : FIN(transacoes) &
+    
     saldoCorrente : contas --> NAT &
     saldoPoupanca : contas --> NAT &
-    origemTransacoes : transacoes --> CONTA &
-    destinoTransacoes: transacoes --> CONTA &
+    
+    origemTransacoes : transacoes --> (contas \/ contasRemovidas) &
+    destinoTransacoes: transacoes --> (contas \/ contasRemovidas) &
     valorTransacoes : transacoes --> NAT &
     tipoTransacoes : transacoes --> TIPOTRANSACAO &
+    
     titular : cartoes --> contas &
     tipoCartao : cartoes --> TIPOCARTAO &
-    
-    limite : creditos --> NAT  &
-    limiteMax : creditos --> NAT &
     bloqueados <: cartoes &
+    
+    limite : cartoes +-> NAT  &
+    limiteMax : cartoes +-> NAT &
+    dom(limite) = creditos &
+    dom(limiteMax) = creditos &
+    
     statusFatura : faturas --> STATUSFATURA &
     totalFatura : faturas --> NAT &
     faturaCartao: faturas --> creditos &
     faturaOrdem : faturas --> NAT &
-    faturaAtual : creditos >-> faturas &
+    faturaAtual : cartoes >+> faturas &
     
-    !(f1, f2).((f1 : faturas & f2 : faturas & f1 /= f2 & faturaCartao(f1) = faturaCartao(f2)) => 
-        faturaOrdem(f1) /= faturaOrdem(f2)) &
+    dom(faturaAtual) = creditos &
+    
+    contas /\ contasRemovidas = {} &
+    
+    /* saques em conta corrente e poupança respeitam mínimo */
+    ran((tipoTransacoes~[{saqueCorrente}]) <| valorTransacoes) <: NAT - (0..saqueMinCorrente - 1) &
+    ran((tipoTransacoes~[{saquePoupanca}]) <| valorTransacoes) <: NAT - (0..saqueMinPoupanca - 1) &
+    
+    /* cada conta só pode ter um cartão de cada tipo */
     !(c1,c2).( c1 : cartoes & c2 : cartoes 
          & titular(c1) = titular(c2) & tipoCartao(c1) = tipoCartao(c2) => c1 = c2 ) &
-    !ct.(ct : creditos => (ordensFaturas(ct) = 0 .. (card( faturaCartao |> {ct} ) - 1 ))) &
-    (faturaAtual;faturaCartao) = id(creditos) &
-    !ct.(ct : creditos => limite(ct) <= limiteMax(ct)) &
 
-    contas /\ contasRemovidas = {}
+    !cts.(cts : creditos => limite(cts) <= limiteMax(cts)) &
+     
+     /* a fatura atual de um cartão é uma fatura desse cartão*/
+    !cts.(cts : creditos => faturaCartao(faturaAtual(cts)) = cts) &
+    
+    /*ordens de faturas formam uma sequência*/
+    !cts.(cts : creditos => (ran(faturaCartao~[{cts}] <| faturaOrdem) = 0 .. (card(faturaCartao |> {cts}) - 1 ))) &
+    /* nenhuma ordem de fatura se repete no mesmo cartão */
+    !(f1, f2).((f1 : faturas & f2 : faturas & f1 /= f2 & faturaCartao(f1) = faturaCartao(f2)) => 
+        faturaOrdem(f1) /= faturaOrdem(f2)) 
+
 DEFINITIONS     
-    creditos == tipoCartao~[{credito}];       
+    creditos == (tipoCartao~[{credito}]);       
     debitos == tipoCartao~[{debito}];    
     transCredito == tipoTransacoes~[{tranCredito}];
-    ordemAtual(ct) == faturaOrdem(faturaAtual(ct));      
+    
+    ordemAtual(ct) == faturaOrdem(faturaAtual(ct));  
+    
     /* faturas que receberão parcelas */
     faturasExistentes(ct, parcelas) == 
-        { fe | fe : faturas & faturaCartao(fe) = ct &
+        {fe | fe : faturas & faturaCartao(fe) = ct &
                               faturaOrdem(fe) : (ordemAtual(ct) .. (ordemAtual(ct) + parcelas - 1))};
-    ordensFaturas(ct) == ran(faturaCartao~[{ct}] <| faturaOrdem);
     
     transacoesDuplicadas(cc) == 
         (( origemTransacoes~[{cc}] /\ tipoTransacoes~[{depositoCorrente}] ) - destinoTransacoes~[{cc}])
@@ -68,9 +91,9 @@ INITIALISATION
     faturaAtual := {} || statusFatura := {} || totalFatura := {} ||
     faturaCartao := {} || faturaOrdem := {} || tipoTransacoes := {} || 
     limiteMax := {}
-
-OPERATIONS
-
+    
+OPERATIONS 
+    
 adicionarConta(cc) =
     PRE
         cc : CONTA &
@@ -84,7 +107,7 @@ adicionarConta(cc) =
 
 depositarCorrente(cc, valor) =
     PRE
-        cc : CONTA & cc : contas & valor : NAT & saldoCorrente(cc) + valor : NAT
+        cc : CONTA & cc : contas & valor : NAT1 & saldoCorrente(cc) + valor : NAT1
     THEN
         saldoCorrente(cc) := saldoCorrente(cc) + valor ||
         ANY
@@ -102,7 +125,7 @@ depositarCorrente(cc, valor) =
 
 depositarPoupanca(cc, valor) =
     PRE
-        cc : CONTA & cc : contas & valor : NAT & saldoPoupanca(cc) + valor : NAT
+        cc : CONTA & cc : contas & valor : NAT1 & saldoPoupanca(cc) + valor : NAT1
     THEN
         saldoPoupanca(cc) := saldoPoupanca(cc) + valor ||
         ANY
@@ -120,7 +143,8 @@ depositarPoupanca(cc, valor) =
         
 sacarCorrente(cc, valor) =
     PRE 
-        cc : CONTA & cc: contas & valor : 1..saldoCorrente(cc)
+        cc : CONTA & cc: contas & valor : NAT1 &
+        valor >= saqueMinCorrente & valor <= saldoCorrente(cc)
     THEN 
         saldoCorrente(cc) := saldoCorrente(cc) - valor ||
         ANY 
@@ -138,7 +162,9 @@ sacarCorrente(cc, valor) =
 
 sacarPoupanca(cc, valor) =
     PRE
-        cc : CONTA & cc : contas & valor : 1..saldoPoupanca(cc) & saldoCorrente(cc) + valor : NAT
+        cc : CONTA & cc : contas & valor : NAT1 &
+        valor >= saqueMinPoupanca & valor <= saldoPoupanca(cc) &
+        saldoCorrente(cc) + valor : NAT
     THEN
         saldoPoupanca(cc) := saldoPoupanca(cc) - valor ||
         saldoCorrente(cc) := saldoCorrente(cc) + valor ||
@@ -154,7 +180,7 @@ sacarPoupanca(cc, valor) =
            tipoTransacoes(tt) := saquePoupanca
        END
     END;
-
+    
 adicionarCartao(ct, tp, cc) =
     PRE
         ct : CARTAO & ct /: cartoes & tp : TIPOCARTAO & cc : CONTA & 
@@ -220,21 +246,19 @@ pagarFatura(cc, ff) =
     
 compraParcelada(co, cd, valor, parcelas) =
     PRE co : CARTAO & cd : CONTA &
-        co : cartoes & co : creditos & cd : contas & 
+        co : creditos & cd : contas & 
         titular(co) /= cd & 
         valor : NAT1 & parcelas : 1..maxParcelas & 
         (valor / parcelas) : NAT &
         co /: bloqueados &
         (valor / parcelas) <= limite(co) &
-	saldoCorrente(cd) + valor : NAT  &
+	    saldoCorrente(cd) + valor : NAT  &
         !ff.(ff : faturasExistentes(co, parcelas) => (totalFatura(ff) + valor/parcelas) : NAT)
     THEN
        LET 
            ordensAusentes, parcela
        BE 
-           /*ordensAusentes = ordensNecessarias - ordensExistentes*/
-           ordensAusentes = (ordemAtual(co) .. (ordemAtual(co) + parcelas - 1)) - 
-                             faturaOrdem[faturasExistentes(co, parcelas)] &
+           ordensAusentes = card(faturaCartao |> {co})..(faturaOrdem(faturaAtual(co)) + parcelas - 1) &
            parcela = (valor / parcelas)
        IN
            ANY 
@@ -308,8 +332,7 @@ compraDebito(co, cd, valor) =
             tipoTransacoes(tt) := tranDebito
         END
    END;
-    
-
+   
 hh <-- historico(cc) = 
    PRE 
        cc : CONTA & cc : contas
@@ -347,7 +370,7 @@ desbloquearCartao(ct) =
     
 atualizarLimiteMax(ct, valor) =
     PRE 
-        ct : CARTAO & ct: creditos & ct /: bloqueados & valor : NAT
+        ct : CARTAO & ct: creditos & ct /: bloqueados & valor : NAT & valor <= MAXINT
     THEN
         limiteMax(ct) := valor ||
         IF 
@@ -363,7 +386,7 @@ atualizarLimite(ct, valor) =
     THEN
       limite(ct) := valor
     END;
-
+    
 vf <-- consultarValorFatura(ct) =
     PRE
         ct : CARTAO & ct : creditos
@@ -384,7 +407,7 @@ ctConta <-- consultarCartoesConta(cc) =
             ctConta := ctContaList    
         END
     END;
-    
+
 ll <-- consultarLimite(ct) = 
     PRE
         ct : CARTAO & ct : creditos
@@ -403,8 +426,15 @@ oo, dd, vv, tp <-- consultarTransacao(tt) =
     PRE
         tt : TRANSACAO & tt : transacoes
     THEN
-        oo := origemTransacoes(tt) || dd := destinoTransacoes(tt) || 
-        vv := valorTransacoes(tt) || tp := tipoTransacoes(tt)
+        vv := valorTransacoes(tt) || 
+        tp := tipoTransacoes(tt) ||
+        ANY ot, dt
+        WHERE 
+            ot : CONTA & dt : CONTA &
+            ot = origemTransacoes(tt) & dt = destinoTransacoes(tt)
+        THEN
+            oo := ot || dd := dt
+        END
     END;
 
 removerConta(cc) = 
@@ -444,8 +474,8 @@ removerConta(cc) =
         saldoPoupanca := {cc} <<| saldoPoupanca ||
         contasRemovidas := contasRemovidas \/ {cc}
     END;
-
-ccs <-- consultarContas = 
+    
+ ccs <-- consultarContas = 
     ANY ccList
     WHERE
           ccList : 0..card(contas)-1 +-> CONTA &
@@ -520,7 +550,7 @@ passarMes =
             //faturaOrdemNovo = %ff.(ff : novasFaturas | faturaOrdem(faturaAtual(faturaCartaoNovo(ff))) + 1) &
             //faturaOrdemNovo = %ff.(ff : novasFaturas | 12) &
             
-            proximaFaturaExistente = {ct, ff | ct : creditos & 
+            proximaFaturaExistente = {ct, ff | ct : cartoesComProximaFatura & 
                                                ff : faturas & 
                                                faturaOrdem(ff) = faturaOrdem(faturaAtual(ct)) + 1 &
                                                faturaCartao(ff) = ct }
@@ -542,6 +572,8 @@ passarMes =
                        novasFaturas * {0}
         END
     END;
+    
+/* --- operações para confirmar pré-condição ---*/
 
 ok <-- pre_adicionarConta(cc) =
     PRE
@@ -560,10 +592,10 @@ ok <-- pre_adicionarConta(cc) =
 
 ok <-- pre_depositarCorrente(cc, valor) =
     PRE
-        cc : CONTA & valor : NAT
+        cc : CONTA & valor : NAT1
     THEN
         IF 
-          cc : contas & saldoCorrente(cc) + valor : NAT 
+          cc : contas & saldoCorrente(cc) + valor : NAT1
 	THEN
             ok := TRUE
         ELSE
@@ -573,11 +605,11 @@ ok <-- pre_depositarCorrente(cc, valor) =
 
 ok <-- pre_depositarPoupanca(cc, valor) =
     PRE
-        cc : CONTA & valor : NAT
+        cc : CONTA & valor : NAT1
     THEN
         IF 
             cc : contas &
-            saldoPoupanca(cc) + valor : NAT
+            saldoPoupanca(cc) + valor : NAT1
         THEN
             ok := TRUE    
         ELSE
@@ -588,11 +620,12 @@ ok <-- pre_depositarPoupanca(cc, valor) =
 
 ok <-- pre_sacarCorrente(cc, valor) =
     PRE
-        cc : CONTA & valor : NAT
+        cc : CONTA & valor : NAT1
     THEN
         IF 
             cc : contas &
-            valor : 1..saldoCorrente(cc)
+            valor : NAT1 &
+            valor >= saqueMinCorrente & valor <= saldoCorrente(cc)
         THEN
             ok := TRUE    
         ELSE
@@ -603,11 +636,12 @@ ok <-- pre_sacarCorrente(cc, valor) =
 
 ok <-- pre_sacarPoupanca(cc, valor) =
     PRE
-        cc : CONTA & valor : NAT
+        cc : CONTA & valor : NAT1
     THEN
         IF 
             cc : contas &
             valor : 1..saldoPoupanca(cc) &
+            valor >= saqueMinPoupanca & valor <= saldoPoupanca(cc) &
             saldoCorrente(cc) + valor : NAT
         THEN
             ok := TRUE    
@@ -674,7 +708,6 @@ ok <-- pre_compraParcelada(co, cd, valor, parcelas) =
         co : CARTAO & cd : CONTA & valor : NAT & parcelas : NAT
     THEN
         IF 
-            co : cartoes &
             co : creditos &
             cd : contas &
             titular(co) /= cd &
@@ -949,6 +982,3 @@ ok <-- pre_passarMes =
         END
 
 END
-
-
-
