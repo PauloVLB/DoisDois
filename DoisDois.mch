@@ -53,9 +53,16 @@ INVARIANT
     /* cada conta só pode ter um cartão de cada tipo */
     !(c1,c2).( c1 : cartoes & c2 : cartoes 
          & titular(c1) = titular(c2) & tipoCartao(c1) = tipoCartao(c2) => c1 = c2 ) &
-
+    
+    /* o limite de um cartão não ultrapassa o limiteMaximo */
     !cts.(cts : creditos => limite(cts) <= limiteMax(cts)) &
      
+    /* as transações da fatura atual de um cartão não ultrapassam o limite */
+    !ff.(ff : ran(faturaAtual) => totalFatura(ff) <= limite(faturaCartao(ff))) & 
+    
+    /* nenhum pix passa do limite*/
+    valorTransacoes[dom(tipoTransacoes |> {tranPix})] <: 0 .. limitePix &
+    
      /* a fatura atual de um cartão é uma fatura desse cartão*/
     !cts.(cts : creditos => faturaCartao(faturaAtual(cts)) = cts) &
     
@@ -294,7 +301,8 @@ pix(co, cd, valor) =
     PRE
         co : CONTA & cd : CONTA &
         co : contas & cd : contas & valor : 1..saldoCorrente(co) & saldoCorrente(cd) + valor : NAT &
-        co /= cd
+        co /= cd &
+        valor : 1..limitePix
     THEN
         saldoCorrente := saldoCorrente <+ {co |-> saldoCorrente(co) - valor, cd |-> saldoCorrente(cd) + valor} ||
         ANY
@@ -368,7 +376,8 @@ desbloquearCartao(ct) =
     
 atualizarLimiteMax(ct, valor) =
     PRE 
-        ct : CARTAO & ct: creditos & ct /: bloqueados & valor : NAT & valor <= MAXINT
+        ct : CARTAO & ct: creditos & ct /: bloqueados & valor : NAT & valor <= MAXINT & 
+        totalFatura(faturaAtual(ct)) <= valor
     THEN
         limiteMax(ct) := valor ||
         IF 
@@ -380,7 +389,8 @@ atualizarLimiteMax(ct, valor) =
     
 atualizarLimite(ct, valor) = 
     PRE 
-      ct : CARTAO & ct : creditos & ct /: bloqueados & valor : 0..limiteMax(ct)
+      ct : CARTAO & ct : creditos & ct /: bloqueados & valor : 0..limiteMax(ct) & 
+      totalFatura(faturaAtual(ct)) <= valor
     THEN
       limite(ct) := valor
     END;
