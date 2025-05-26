@@ -256,7 +256,7 @@ compraParcelada(co, cd, valor, parcelas) =
         valor : NAT1 & parcelas : 1..maxParcelas & 
         (valor / parcelas) : NAT &
         co /: bloqueados &
-        (valor / parcelas) <= limite(co) &
+        (valor / parcelas) + totalFatura(faturaAtual(co)) <= limite(co) &
 	    saldoCorrente(cd) + valor : NAT  &
         !ff.(ff : faturasExistentes(co, parcelas) => (totalFatura(ff) + valor/parcelas) : NAT)
     THEN
@@ -285,8 +285,6 @@ compraParcelada(co, cd, valor, parcelas) =
                valorTransacoes := valorTransacoes \/ {tDestino |-> valor} \/ (tOrigem * {parcela}) ||
                tipoTransacoes := tipoTransacoes \/ {tDestino |-> depositoCorrente} \/ (tOrigem * {tranCredito})  ||
                saldoCorrente(cd) := saldoCorrente(cd) + valor ||
-               
-               limite(co) := limite(co) - parcela ||
                /*criar faturas novas*/
                faturas := faturas \/ novasFaturas ||
                statusFatura := statusFatura \/ (novasFaturas * {aberta}) ||
@@ -429,6 +427,14 @@ lm <-- consultarLimiteMax(ct) =
     THEN
         lm := limiteMax(ct)
     END;
+    
+ld <-- consultarLimiteDisponivel(ct) =
+    PRE 
+        ct : CARTAO & ct : creditos
+    THEN
+        ld := limite(ct) - totalFatura(faturaAtual(ct))
+    END;
+    
     
 oo, dd, vv, tp <-- consultarTransacao(tt) = 
     PRE
@@ -723,7 +729,7 @@ ok <-- pre_compraParcelada(co, cd, valor, parcelas) =
             parcelas : 1..maxParcelas &
             (valor / parcelas) : NAT &
             co /: bloqueados &
-            (valor / parcelas) <= limite(co) &
+            (valor / parcelas) + totalFatura(faturaAtual(co)) <= limite(co) &
             saldoCorrente(cd) + valor : NAT &
             !ff.(ff : faturasExistentes(co, parcelas) => (totalFatura(ff) + valor/parcelas) : NAT)
         THEN
@@ -834,8 +840,10 @@ ok <-- pre_atualizarLimiteMax(ct, valor) =
         ct : CARTAO & valor : NAT
     THEN
         IF 
-            ct : creditos &
-            ct /: bloqueados
+            ct: creditos & 
+            ct /: bloqueados & valor : NAT & 
+            valor <= MAXINT & 
+            totalFatura(faturaAtual(ct)) <= valor
         THEN
             ok := TRUE    
         ELSE
@@ -849,9 +857,10 @@ ok <-- pre_atualizarLimite(ct, valor) =
         ct : CARTAO & valor : NAT
     THEN
         IF 
-            ct : creditos &
-            ct /: bloqueados &
-            valor : 0..limiteMax(ct)
+            ct : creditos & 
+            ct /: bloqueados & 
+            valor : 0..limiteMax(ct) & 
+            totalFatura(faturaAtual(ct)) <= valor
         THEN
             ok := TRUE    
         ELSE
@@ -913,6 +922,19 @@ ok <-- pre_consultarLimiteMax(ct) =
             ok := FALSE
         END
 
+    END;
+
+ok <-- pre_consultarLimiteDisponivel(ct) =
+    PRE 
+        ct : CARTAO 
+    THEN
+        IF 
+            ct : creditos
+        THEN
+            ok := TRUE    
+        ELSE
+            ok := FALSE
+        END
     END;
 
 ok <-- pre_consultarTransacao(tt) =

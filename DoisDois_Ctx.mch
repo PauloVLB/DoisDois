@@ -9,11 +9,12 @@ SETS
 
 CONSTANTS         
     taxaRendimento, jurosFatura, maxParcelas, limiteMaxPadrao, 
-    saqueMinCorrente, saqueMinPoupanca    
+    saqueMinCorrente, saqueMinPoupanca, limitePix    
 
 PROPERTIES        
     taxaRendimento : NAT1 & jurosFatura : NAT1 & 
     limiteMaxPadrao : NAT & maxParcelas : NAT1 &
-    saqueMinCorrente : NAT1& saqueMinPoupanca : NAT1 
+    saqueMinCorrente : NAT1& saqueMinPoupanca : NAT1 &
+    limitePix : NAT1
 
 END
