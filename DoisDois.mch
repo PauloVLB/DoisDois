@@ -1,9 +1,30 @@
 MACHINE 
     DoisDois
     
-SEES
-    DoisDois_Ctx
+SETS 
+    CONTA; FATURA; CARTAO; TRANSACAO;
+    STATUSFATURA = {paga, vencida, aberta};
+    TIPOCARTAO = {credito, debito};
+    TIPOTRANSACAO = {saqueCorrente, saquePoupanca, depositoCorrente, depositoPoupanca, tranCredito, tranDebito, tranPix}
+
+CONSTANTS         
+    taxaRendimento, jurosFatura, maxParcelas, limiteMaxPadrao, 
+    saqueMinCorrente, saqueMinPoupanca, limitePix,
+    contaDummy, cartaoDummy, faturaDummy, transacaoDummy, 
+    maxConta, maxCartao, maxFatura, maxTransacao
     
+
+PROPERTIES        
+    maxConta : NAT & card(CONTA) = maxConta + 1 &
+    maxCartao : NAT & card(CARTAO) = maxCartao + 1 &
+    maxFatura : NAT & card(FATURA) = maxFatura + 1 &
+    maxTransacao : NAT & card(TRANSACAO) = maxTransacao + 1 &
+    taxaRendimento : NAT1 & jurosFatura : NAT1 & 
+    limiteMaxPadrao : NAT & maxParcelas : NAT1 &
+    saqueMinCorrente : NAT1& saqueMinPoupanca : NAT1 &
+    limitePix : NAT1 & contaDummy : CONTA & cartaoDummy : CARTAO &
+    faturaDummy : FATURA & transacaoDummy : TRANSACAO
+
 VARIABLES
     contas, cartoes, faturas, transacoes, saldoCorrente, saldoPoupanca, 
     origemTransacoes, destinoTransacoes, valorTransacoes, limite, titular,
@@ -336,27 +357,7 @@ compraDebito(co, cd, valor) =
         END
    END;
    
-hh <-- historico(cc) = 
-   PRE 
-       cc : CONTA & cc : contas
-   THEN
-      ANY hhList
-      WHERE
-          hhList : 0..card(conjuntoHistorico(cc))-1 +-> TRANSACAO &
-          ran(hhList) = conjuntoHistorico(cc)
-      THEN
-          hh := hhList
-      END
-   END;
-   
-   
-sc, sp <-- consultarSaldos(cc) = 
-    PRE 
-        cc : CONTA & cc : contas
-    THEN
-        sc := saldoCorrente(cc) || sp := saldoPoupanca(cc)
-    END;
-
+  
 bloquearCartao(ct) =
     PRE 
         ct : CARTAO & ct : cartoes & ct /: bloqueados
@@ -390,55 +391,6 @@ atualizarLimite(ct, valor) =
       limite(ct) := valor
     END;
     
-vf <-- consultarValorFatura(ct) =
-    PRE
-        ct : CARTAO & ct : creditos
-    THEN
-        vf := totalFatura(faturaAtual(ct))
-    END;
-    
-ctConta <-- consultarCartoesConta(cc) = 
-    PRE 
-        cc : CONTA & cc : contas
-    THEN
-        ANY ctContaList
-        WHERE
-            titular~[{cc}]: FIN(titular~[{cc}]) &
-            ctContaList : 0..card(titular~[{cc}])-1 +-> CARTAO &
-            ran(ctContaList) = titular~[{cc}]
-        THEN
-            ctConta := ctContaList    
-        END
-    END;
-
-ll <-- consultarLimiteDisponivel(ct) = 
-    PRE
-        ct : CARTAO & ct : creditos
-    THEN
-        ll := limite(ct)
-    END;
-
-lm <-- consultarLimiteMax(ct) = 
-    PRE
-        ct : CARTAO & ct : creditos
-    THEN
-        lm := limiteMax(ct)
-    END; 
-    
-oo, dd, vv, tp <-- consultarTransacao(tt) = 
-    PRE
-        tt : TRANSACAO & tt : transacoes
-    THEN
-        vv := valorTransacoes(tt) || 
-        tp := tipoTransacoes(tt) ||
-        ANY ot, dt
-        WHERE 
-            ot : CONTA & dt : CONTA &
-            ot = origemTransacoes(tt) & dt = destinoTransacoes(tt)
-        THEN
-            oo := ot || dd := dt
-        END
-    END;
 
 removerConta(cc) = 
     PRE
@@ -481,45 +433,10 @@ removerConta(cc) =
  ccs <-- consultarContas = 
     ANY ccList
     WHERE
-          ccList : 0..card(contas)-1 +-> CONTA &
-          ran(ccList) = contas
+          ccList : CONTA --> BOOL &
+          dom(ccList |> {TRUE}) = contas
     THEN
           ccs := ccList
-    END;
-    
-ftCartao <-- consultarFaturasCartao(ct) = 
-    PRE 
-        ct : CARTAO & ct : cartoes & faturaCartao~[{ct}] : FIN(faturaCartao~[{ct}])
-    THEN
-        ANY ffList
-        WHERE
-              ffList : 0..card(faturaCartao~[{ct}])-1 +-> FATURA &
-              ran(ffList) = faturaCartao~[{ct}]
-        THEN
-              ftCartao := ffList
-        END
-    END;
-
-ct, tt, oo, st, atual <-- consultarFatura(ff) =
-    PRE 
-        ff : FATURA & ff : faturas
-    THEN
-        tt := totalFatura(ff) ||
-        oo := faturaOrdem(ff) || st := statusFatura(ff) ||
-        ANY 
-            cartao 
-        WHERE 
-            cartao : CARTAO & cartao : cartoes & cartao = faturaCartao(ff)
-        THEN
-            ct := cartao ||
-            IF 
-                faturaAtual(cartao) = ff
-            THEN
-                atual := TRUE
-            ELSE
-                atual := FALSE
-            END
-        END
     END;
     
 
@@ -957,7 +874,6 @@ ok <-- pre_consultarFaturasCartao(ct) =
 
     END;
 
-ok <-- pre_consultarContas = ok := TRUE;
 
 ok <-- pre_consultarFatura(ff) =
     PRE

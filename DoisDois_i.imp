@@ -1,0 +1,236 @@
+IMPLEMENTATION DoisDois_i
+REFINES DoisDois
+    
+SETS
+     STATUSCONTA = {ativa, livre, removida}
+     
+VALUES  
+    maxConta = 50;
+    maxCartao = 100;
+    maxFatura = 100;
+    maxTransacao = 200;
+    CONTA = 0..maxConta;
+    TRANSACAO = 0..maxTransacao;
+    FATURA = 0..maxFatura;
+    CARTAO = 0..maxCartao;
+    taxaRendimento = 2;
+    jurosFatura = 2; 
+    maxParcelas = 10;
+    limiteMaxPadrao = 15;
+    saqueMinCorrente = 30;
+    saqueMinPoupanca = 20;
+    limitePix = 50;
+    contaDummy = 0;
+    cartaoDummy = 0;
+    faturaDummy = 0;
+    transacaoDummy = 0
+    
+CONCRETE_VARIABLES
+    i_estadoConta, i_cartoes, i_faturas, i_transacoes,
+    i_bloqueados, i_saldoCorrente, i_saldoPoupanca,
+    i_valorTransacoes, i_tipoTransacoes, i_tipoCartao,
+    i_limite, i_limiteMax, i_faturaOrdem,
+    i_statusFatura, i_totalFatura, i_titular,
+    i_faturaAtual, i_origem, i_destino, i_faturaCartao
+INVARIANT
+
+    i_estadoConta : CONTA --> STATUSCONTA &
+    contas = dom(i_estadoConta |> {ativa}) &
+    contasRemovidas = dom(i_estadoConta |> {removida}) &
+    
+    i_cartoes : CARTAO --> BOOL &
+    cartoes = dom(i_cartoes |> {TRUE}) &
+    
+    i_faturas : FATURA --> BOOL &
+    faturas = dom(i_faturas |> {TRUE}) &
+    
+    i_transacoes : TRANSACAO --> BOOL &
+    transacoes = dom(i_transacoes |> {TRUE}) &
+    
+    i_bloqueados : CARTAO --> BOOL &
+    bloqueados = dom(i_bloqueados |> {TRUE}) &
+    dom(i_bloqueados |> {TRUE}) <: cartoes &
+    
+    
+    i_saldoCorrente : CONTA --> NAT &
+    saldoCorrente = contas <| i_saldoCorrente &
+    i_saldoPoupanca : CONTA --> NAT &
+    saldoPoupanca = contas <| i_saldoPoupanca &
+   
+    i_origem : TRANSACAO --> CONTA &
+    origemTransacoes = transacoes <| i_origem &
+    i_destino : TRANSACAO --> CONTA &
+    destinoTransacoes = transacoes <| i_destino &
+    
+    i_valorTransacoes : TRANSACAO --> NAT &
+    i_tipoTransacoes : TRANSACAO --> TIPOTRANSACAO &
+    valorTransacoes = transacoes <| i_valorTransacoes &
+    tipoTransacoes  = transacoes <| i_tipoTransacoes &
+    
+    // mesmo problema de i_origem/i_destino
+    i_titular : CARTAO --> CONTA &
+    titular = cartoes <| i_titular &
+    
+    i_tipoCartao : CARTAO --> TIPOCARTAO &
+    tipoCartao = cartoes <| i_tipoCartao &
+    
+    i_limite    : CARTAO --> NAT &
+    i_limiteMax : CARTAO --> NAT &
+    limite = creditos <| i_limite &
+    limiteMax = creditos <| i_limiteMax &
+    
+    i_statusFatura : FATURA --> STATUSFATURA &
+    i_totalFatura : FATURA --> NAT &
+    statusFatura = faturas <| i_statusFatura &
+    totalFatura = faturas <| i_totalFatura &
+   
+    i_faturaAtual : CARTAO --> FATURA &
+    creditos <| i_faturaAtual : CARTAO >-> FATURA &
+    faturaAtual = creditos <| i_faturaAtual &
+    
+    i_faturaCartao: FATURA --> CARTAO &
+    faturaCartao =  (faturas <| i_faturaCartao) |> creditos &
+    
+    i_faturaOrdem : FATURA --> NAT &
+    faturaOrdem = faturas <| i_faturaOrdem
+DEFINITIONS     
+    creditos == (tipoCartao~[{credito}])     
+    
+INITIALISATION
+    i_estadoConta := CONTA*{livre};
+    i_cartoes := CARTAO*{FALSE};
+    i_faturas := FATURA*{FALSE};
+    i_transacoes := TRANSACAO*{FALSE};
+    i_saldoCorrente := CONTA*{0};
+    i_saldoPoupanca := CONTA*{0};
+    i_bloqueados := CARTAO*{FALSE};
+    i_valorTransacoes := TRANSACAO*{0};
+    // crime, mas só pensei nisso para não mexer na máquina
+    i_tipoTransacoes := TRANSACAO*{depositoCorrente};
+    i_tipoCartao := CARTAO*{debito};
+    i_limite := CARTAO*{0};
+    i_limiteMax := CARTAO * {limiteMaxPadrao};
+    i_statusFatura := FATURA*{aberta};
+    i_totalFatura := FATURA*{0};
+    i_titular := CARTAO*{contaDummy};
+    i_faturaAtual := CARTAO*{faturaDummy};
+    i_origem := TRANSACAO*{contaDummy};
+    i_destino := TRANSACAO*{contaDummy};
+    i_faturaCartao := FATURA*{cartaoDummy};
+    i_faturaOrdem := FATURA*{0}
+    
+
+OPERATIONS
+    adicionarConta(cc) = skip;
+
+    depositarCorrente(cc, valor) = skip;
+    
+    depositarPoupanca(cc, valor) = skip;
+    
+    sacarCorrente(cc, valor) = skip;
+    
+    sacarPoupanca(cc, valor) = skip;
+    
+    adicionarCartao(ct, tp, cc) = skip;
+    
+    removerCartao(ct) = skip;
+    
+    pagarFatura(cc, ff) = skip;
+    
+    compraParcelada(co, cd, valor, parcelas) = skip;
+    
+    pix(co, cd, valor) = skip;
+    
+    compraDebito(co, cd, valor) = skip;
+    
+    ccs <-- consultarContas = 
+        BEGIN
+            VAR ii IN
+                ii := 0;
+                ccs := (0..maxConta) * {FALSE};
+                WHILE ii <= maxConta DO
+                    VAR atual IN atual := i_estadoConta(ii);
+                    IF 
+                        atual = ativa
+                    THEN
+                        ccs(ii) := TRUE
+                    END;
+                    ii := ii + 1
+                    END
+                INVARIANT
+                    ii : 0..(maxConta+1) &
+                    i_estadoConta : 0..maxConta --> STATUSCONTA &
+                    ccs : 0..maxConta --> BOOL &
+                    dom(ccs |> {TRUE}) = dom(i_estadoConta |> {ativa}) /\ 0..(ii-1)
+                VARIANT
+                    (maxConta + 1) - ii 
+                END
+            END
+
+        END;
+    
+    bloquearCartao(ct) = skip;
+    
+    desbloquearCartao(ct) = skip;
+    
+    atualizarLimiteMax(ct, valor) = skip;
+    
+    atualizarLimite(ct, valor) = skip;
+    
+    removerConta(cc) = skip;
+    
+    passarMes = skip;
+    
+    ok <-- pre_adicionarConta(cc) = skip;
+    
+    ok <-- pre_depositarCorrente(cc, valor) = skip;
+    
+    ok <-- pre_depositarPoupanca(cc, valor) = skip;
+    
+    ok <-- pre_sacarCorrente(cc, valor) = skip;
+    
+    ok <-- pre_sacarPoupanca(cc, valor) = skip;
+    
+    ok <-- pre_adicionarCartao(ct, tp, cc) = skip;
+    
+    ok <-- pre_removerCartao(ct) = skip;
+    
+    ok <-- pre_pagarFatura(cc, ff) = skip;
+    
+    ok <-- pre_compraParcelada(co, cd, valor, parcelas) = skip;
+    
+    ok <-- pre_pix(co, cd, valor) = skip;
+    
+    ok <-- pre_compraDebito(co, cd, valor) = skip;
+    
+    ok <-- pre_historico(cc) = skip;
+    
+    ok <-- pre_consultarSaldos(cc) = skip;
+    
+    ok <-- pre_bloquearCartao(ct) = skip;
+    
+    ok <-- pre_desbloquearCartao(ct) = skip;
+    
+    ok <-- pre_atualizarLimiteMax(ct, valor) = skip;
+    
+    ok <-- pre_atualizarLimite(ct, valor) = skip;
+    
+    ok <-- pre_consultarValorFatura(ct) = skip;
+    
+    ok <-- pre_consultarCartoesConta(cc) = skip;
+    
+    ok <-- pre_consultarLimiteDisponivel(ct) = skip;
+    
+    ok <-- pre_consultarLimiteMax(ct) = skip;
+    
+    ok <-- pre_consultarTransacao(tt) = skip;
+    
+    ok <-- pre_removerConta(cc) = skip;
+    
+    ok <-- pre_consultarFaturasCartao(ct) = skip;
+    
+    ok <-- pre_consultarFatura(ff) = skip;
+    
+    ok <-- pre_passarMes = skip
+    
+END
