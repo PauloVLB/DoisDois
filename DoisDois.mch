@@ -207,7 +207,8 @@ sacarPoupanca(cc, valor) =
 adicionarCartao(ct, tp, cc) =
     PRE
         ct : CARTAO & ct /: cartoes & tp : TIPOCARTAO & cc : CONTA & 
-        cc : contas & tipoCartao~[{tp}] /\ titular~[{cc}] = {}
+        cc : contas & tipoCartao~[{tp}] /\ titular~[{cc}] = {} & 
+        (tp = credito => (FATURA - faturas /= {}))
     THEN
         cartoes := cartoes \/ {ct} ||
         tipoCartao(ct) := tp ||
@@ -220,7 +221,7 @@ adicionarCartao(ct, tp, cc) =
           ANY 
               ff 
           WHERE 
-              ff : FATURA & ff /: faturas 
+              ff : FATURA - faturas 
           THEN
               faturas := faturas \/ {ff} ||
               faturaAtual(ct) := ff  ||
@@ -578,7 +579,8 @@ ok <-- pre_adicionarCartao(ct, tp, cc) =
         IF 
             ct /: cartoes &
             cc : contas &
-            tipoCartao~[{tp}] /\ titular~[{cc}] = {}
+            tipoCartao~[{tp}] /\ titular~[{cc}] = {} &
+             (tp = credito => (FATURA - faturas /= {}))
         THEN
             ok := TRUE    
         ELSE
