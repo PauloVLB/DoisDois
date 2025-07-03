@@ -1,6 +1,13 @@
 IMPLEMENTATION DoisDois_i
 REFINES DoisDois
+
+CONCRETE_CONSTANTS 
+    ativa, removida, livre, STATUSCONTA
     
+PROPERTIES
+    ativa : NAT & removida : NAT & livre : NAT &
+    ativa /= livre & ativa /= removida & removida /= livre &
+    STATUSCONTA <: NAT
      
 VALUES  
     maxConta = 50;
@@ -21,10 +28,14 @@ VALUES
     contaDummy = 0;
     cartaoDummy = 0;
     faturaDummy = 0;
-    transacaoDummy = 0
+    transacaoDummy = 0;
+    ativa = 1;
+    removida = 2;
+    livre = 0;
+    STATUSCONTA = livre..removida
     
 CONCRETE_VARIABLES
-    i_contas, i_contasRemovidas, i_cartoes, i_faturas, i_transacoes,
+    i_contas, i_cartoes, i_faturas, i_transacoes,
     i_bloqueados, i_saldoCorrente, i_saldoPoupanca,
     i_valorTransacoes, i_tipoTransacoes, i_tipoCartao,
     i_limite, i_limiteMax, i_faturaOrdem,
@@ -33,10 +44,9 @@ CONCRETE_VARIABLES
     i_faturasUso
 INVARIANT
 
-    i_contas: CONTA --> BOOL &
-    i_contasRemovidas: CONTA --> BOOL &
-    contas = dom(i_contas |> {TRUE}) &
-    contasRemovidas = dom(i_contasRemovidas |> {TRUE}) &
+    i_contas: CONTA --> STATUSCONTA &
+    contas = dom(i_contas |> {ativa}) &
+    contasRemovidas = dom(i_contas |> {removida}) &
     
     i_cartoes : CARTAO --> BOOL &
     cartoes = dom(i_cartoes |> {TRUE}) &
@@ -100,8 +110,7 @@ DEFINITIONS
     creditos == (tipoCartao~[{credito}])     
     
 INITIALISATION
-    i_contas := CONTA*{FALSE};
-    i_contasRemovidas := CONTA*{FALSE};
+    i_contas := CONTA*{livre};
     i_cartoes := CARTAO*{FALSE};
     i_faturas := FATURA*{FALSE};
     i_transacoes := TRANSACAO*{FALSE};
@@ -128,7 +137,7 @@ INITIALISATION
 OPERATIONS
 adicionarConta(cc) = 
     BEGIN
-        i_contas(cc) := TRUE;
+        i_contas(cc) := ativa;
         i_saldoCorrente(cc) := 0;
         i_saldoPoupanca(cc) := 0 
     END;
@@ -180,7 +189,7 @@ ccs <-- consultarContas =
             WHILE ii <= maxConta DO
                 VAR atual IN atual := i_contas(ii);
                 IF 
-                    atual = TRUE
+                    atual = ativa
                 THEN
                     ccs(ii) := TRUE
                 END;
@@ -188,9 +197,9 @@ ccs <-- consultarContas =
                 END
             INVARIANT
                 ii : 0..(maxConta+1) &
-                i_contas : 0..maxConta --> BOOL &
+                i_contas : 0..maxConta --> STATUSCONTA &
                 ccs : 0..maxConta --> BOOL &
-                dom(ccs |> {TRUE}) = dom(i_contas |> {TRUE}) /\ 0..(ii-1)
+                dom(ccs |> {TRUE}) = dom(i_contas |> {ativa}) /\ 0..(ii-1)
             VARIANT
                 (maxConta + 1) - ii 
             END
@@ -212,11 +221,10 @@ passarMes = skip;
 
 ok <-- pre_adicionarConta(cc) =
     VAR
-        ativa, removida
+        status
     IN
-        ativa := i_contas(cc);
-        removida := i_contasRemovidas(cc);
-        ok := bool(ativa = FALSE & removida = FALSE)
+        status := i_contas(cc);
+        ok := bool(status = livre)
     END;
     
 ok <-- pre_depositarCorrente(cc, valor) = skip;
@@ -236,7 +244,7 @@ ok <-- pre_adicionarCartao(ct, tp, cc) =
         IN 
             // verificar se conta é ativa e se cartão já foi adicionado
             statusConta := i_contas(cc) ;
-            contaAtiva := bool(statusConta = TRUE);
+            contaAtiva := bool(statusConta = ativa);
             statusCartao := i_cartoes(ct);
             cartaoLivre := bool(statusCartao = FALSE);
             
