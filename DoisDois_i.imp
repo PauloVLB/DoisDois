@@ -41,7 +41,7 @@ CONCRETE_VARIABLES
     i_limite, i_limiteMax, i_faturaOrdem,
     i_statusFatura, i_totalFatura, i_titular,
     i_faturaAtual, i_origem, i_destino, i_faturaCartao,
-    i_faturasUso
+    tamFatura
 INVARIANT
 
     i_contas: CONTA --> STATUSCONTA &
@@ -95,7 +95,7 @@ INVARIANT
     totalFatura = faturas <| i_totalFatura &
    
     i_faturaAtual : CARTAO --> FATURA &
-    creditos <| i_faturaAtual : CARTAO >-> FATURA &
+    creditos <| i_faturaAtual : CARTAO >+> FATURA &
     faturaAtual = creditos <| i_faturaAtual &
     
     i_faturaCartao: FATURA --> CARTAO &
@@ -105,7 +105,7 @@ INVARIANT
     faturaOrdem = faturas <| i_faturaOrdem &
     
     /*auxiliares*/
-    i_faturasUso : NAT & i_faturasUso = card(faturas)
+    tamFatura : NAT & tamFatura = card(faturas) 
 DEFINITIONS     
     creditos == (tipoCartao~[{credito}])     
     
@@ -131,7 +131,7 @@ INITIALISATION
     i_destino := TRANSACAO*{contaDummy};
     i_faturaCartao := FATURA*{cartaoDummy};
     i_faturaOrdem := FATURA*{0};
-    i_faturasUso := 0
+    tamFatura := 0
     
 
 OPERATIONS
@@ -156,22 +156,76 @@ adicionarCartao(ct, tp, cc) =
         i_tipoCartao(ct) := tp;
         i_titular(ct) := cc;
         IF tp = credito THEN
-            VAR novaFatura IN
-                novaFatura := i_faturasUso; 
-                i_faturas(novaFatura) := TRUE;
-                i_faturasUso := i_faturasUso + 1;
-                i_faturaAtual(ct) := novaFatura;
-                i_statusFatura(novaFatura) := aberta;
-                i_totalFatura(novaFatura) := 0;
-                i_faturaCartao(novaFatura) := ct;
-                i_faturaOrdem(novaFatura) := 0;
+            
+            VAR ii, atual IN
+                ii := 0;
+                atual := i_faturas(ii);
+                
+                WHILE ii <= maxFatura & atual = TRUE DO
+                    ii := ii + 1;
+                    atual := i_faturas(ii)      
+                INVARIANT 
+                    ii : 0..(maxFatura + 1) &
+                    i_faturas : FATURA --> BOOL &
+                    FALSE /: i_faturas[0..(ii-1)]
+                VARIANT 
+                    maxFatura + 1 - ii
+                END;
+                
+                i_faturas(ii) := TRUE;
+                tamFatura := tamFatura + 1;
+                i_faturaAtual(ct) := ii;
+                i_statusFatura(ii) := aberta;
+                i_totalFatura(ii) := 0;
+                i_faturaCartao(ii) := ct;
+                i_faturaOrdem(ii) := 0;
                 i_limite(ct) := limiteMaxPadrao;
                 i_limiteMax(ct) := limiteMaxPadrao
+                    
             END
          END
     END;
     
-removerCartao(ct) = skip;
+removerCartao(ct) = 
+    BEGIN
+        VAR tipo IN
+            tipo := i_tipoCartao(ct);
+            
+            i_cartoes(ct) := FALSE;
+            
+            IF 
+                tipo = credito 
+            THEN
+                VAR ii, fatura, cartao IN
+                    ii := 0;
+                    
+                    WHILE ii <= maxFatura DO
+                        fatura := i_faturas(ii);
+                        cartao := i_faturaCartao(ii);
+                        IF 
+                            fatura = TRUE & cartao = ct
+                        THEN 
+                            i_faturas(ii) := FALSE;
+                            tamFatura := tamFatura - 1
+                        END; // DO IF INTERNO
+                        ii := ii + 1
+                    INVARIANT
+                        ii : 0..(maxFatura + 1) &
+                        i_faturas : FATURA --> BOOL &
+                        i_statusFatura : FATURA --> STATUSFATURA &
+                        i_totalFatura : FATURA --> NAT &
+                        i_faturaCartao : FATURA --> CARTAO &
+                        i_faturaOrdem : FATURA --> NAT &
+                        TRUE /: ran(dom((0..(ii-1) <| i_faturaCartao) |> {ct}) <| i_faturas)
+                        // o que espero no final: ran(dom(i_faturaCartao |> {ct}) <| i_faturas) = {FALSE}
+
+                    VARIANT
+                        maxFatura + 1 - ii
+                    END 
+                END 
+            END 
+        END
+    END;
 
 pagarFatura(cc, ff) = skip;
 
@@ -197,11 +251,11 @@ ccs <-- consultarContas =
                 END
             INVARIANT
                 ii : 0..(maxConta+1) &
-                i_contas : 0..maxConta --> STATUSCONTA &
+                i_contas : (0..maxConta) --> STATUSCONTA &
                 ccs : 0..maxConta --> BOOL &
                 dom(ccs |> {TRUE}) = dom(i_contas |> {ativa}) /\ 0..(ii-1)
             VARIANT
-                (maxConta + 1) - ii 
+                maxConta - ii + 1
             END
         END
 
@@ -240,13 +294,14 @@ ok <-- pre_adicionarCartao(ct, tp, cc) =
         VAR 
             contaAtiva, cartaoLivre,
             statusConta, statusCartao,
-            cartaoDuplicado
+            cartaoDuplicado, temFatura
         IN 
             // verificar se conta é ativa e se cartão já foi adicionado
             statusConta := i_contas(cc) ;
             contaAtiva := bool(statusConta = ativa);
             statusCartao := i_cartoes(ct);
             cartaoLivre := bool(statusCartao = FALSE);
+            temFatura := bool(tp = debito or tamFatura < maxFatura);
             
             // verificar se titular já tem um cartão desse tipo
             cartaoDuplicado := FALSE;
@@ -277,11 +332,12 @@ ok <-- pre_adicionarCartao(ct, tp, cc) =
                     (cartaoDuplicado = FALSE) => 
                     (!jj.(jj:0..ii-1 => not(i_cartoes(jj) = TRUE & i_titular(jj) = cc & i_tipoCartao(jj) = tp)))
                 VARIANT
-                    (maxCartao + 1) - ii
+                    maxCartao + 1 - ii
                 END;
                 
                 IF 
-                    contaAtiva = TRUE & cartaoLivre = TRUE & cartaoDuplicado = FALSE
+                    contaAtiva = TRUE & cartaoLivre = TRUE & 
+                    cartaoDuplicado = FALSE & temFatura = TRUE
                 THEN
                     ok := TRUE
                 ELSE
