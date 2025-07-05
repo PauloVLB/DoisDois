@@ -427,7 +427,7 @@ ok <-- pre_adicionarCartao(ct, tp, cc) =
         temFatura := bool(tp = debito or tamFatura < maxFatura);
         
         IF 
-            tp = credito & cartaoLivre = TRUE & statusConta = livre & temFatura = TRUE
+            tp = credito & cartaoLivre = TRUE & statusConta = ativa & temFatura = TRUE
         THEN
         
             // verificar se titular já tem um cartão desse tipo
@@ -462,11 +462,19 @@ ok <-- pre_adicionarCartao(ct, tp, cc) =
                     (maxCartao + 1) - ii
                 END;
                 
-                ok:= cartaoDuplicado
+                IF 
+                    cartaoDuplicado = TRUE
+                THEN
+                    ok := FALSE
+                ELSE
+                    ok := TRUE
+                END
+                
+                
              END
                 
            ELSIF 
-               statusConta = livre & cartaoLivre = TRUE 
+               statusConta = ativa & cartaoLivre = TRUE 
            THEN
                 ok := TRUE
            ELSE
