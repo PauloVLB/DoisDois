@@ -167,7 +167,8 @@ depositarPoupanca(cc, valor) =
 sacarCorrente(cc, valor) =
     PRE 
         cc : CONTA & cc: contas & valor : NAT1 &
-        valor >= saqueMinCorrente & valor <= saldoCorrente(cc)
+        valor >= saqueMinCorrente & valor <= saldoCorrente(cc) &
+        TRANSACAO - transacoes /= {}
     THEN 
         saldoCorrente(cc) := saldoCorrente(cc) - valor ||
         ANY 
@@ -235,7 +236,7 @@ adicionarCartao(ct, tp, cc) =
     
 removerCartao(ct) =
     PRE
-        ct : CARTAO & ct : cartoes & ((tipoCartao(ct) = credito) => (faturaCartao~[{ct}] <: statusFatura~[{paga}] \/ totalFatura~[{0}]))
+        ct : CARTAO & ct : cartoes & (tipoCartao(ct) = credito => dom(faturaCartao |> {ct}) <: (dom(statusFatura |> {paga}) \/ dom (totalFatura  |> {0})))
     THEN
         cartoes := cartoes - {ct} ||
         bloqueados := cartoes - {ct} ||
@@ -430,16 +431,6 @@ removerConta(cc) =
         saldoPoupanca := {cc} <<| saldoPoupanca ||
         contasRemovidas := contasRemovidas \/ {cc}
     END;
-    
- ccs <-- consultarContas = 
-    ANY ccList
-    WHERE
-          ccList : CONTA --> BOOL &
-          dom(ccList |> {TRUE}) = contas
-    THEN
-          ccs := ccList
-    END;
-    
 
 
 passarMes =
@@ -494,6 +485,23 @@ passarMes =
         END
     END;
     
+    
+ ccs <-- consultarContas = 
+    ANY ccList
+    WHERE
+          ccList : CONTA --> BOOL &
+          dom(ccList |> {TRUE}) = contas
+    THEN
+          ccs := ccList
+    END;
+    
+sc, sp <-- consultarSaldos(cc) = 
+    PRE 
+        cc : CONTA & cc : contas
+    THEN
+        sc := saldoCorrente(cc) || sp := saldoPoupanca(cc)
+    END;
+    
 /* --- operações para confirmar pré-condição ---*/
 
 ok <-- pre_adicionarConta(cc) =
@@ -513,10 +521,12 @@ ok <-- pre_adicionarConta(cc) =
 
 ok <-- pre_depositarCorrente(cc, valor) =
     PRE
-        cc : CONTA & valor : NAT1
+        cc : CONTA & valor : NAT
     THEN
         IF 
-          cc : contas & saldoCorrente(cc) + valor : NAT1
+          cc : contas &
+          valor : NAT1 &
+          saldoCorrente(cc) + valor : NAT
 	THEN
             ok := TRUE
         ELSE
@@ -526,11 +536,12 @@ ok <-- pre_depositarCorrente(cc, valor) =
 
 ok <-- pre_depositarPoupanca(cc, valor) =
     PRE
-        cc : CONTA & valor : NAT1
+        cc : CONTA & valor : NAT
     THEN
         IF 
             cc : contas &
-            saldoPoupanca(cc) + valor : NAT1
+            valor : NAT1 &
+            saldoPoupanca(cc) + valor : NAT
         THEN
             ok := TRUE    
         ELSE
@@ -541,7 +552,7 @@ ok <-- pre_depositarPoupanca(cc, valor) =
 
 ok <-- pre_sacarCorrente(cc, valor) =
     PRE
-        cc : CONTA & valor : NAT1
+        cc : CONTA & valor : NAT
     THEN
         IF 
             cc : contas &
@@ -557,13 +568,13 @@ ok <-- pre_sacarCorrente(cc, valor) =
 
 ok <-- pre_sacarPoupanca(cc, valor) =
     PRE
-        cc : CONTA & valor : NAT1
+        cc : CONTA & valor : NAT
     THEN
         IF 
             cc : contas &
-            valor : 1..saldoPoupanca(cc) &
+            valor : NAT1 &
             valor >= saqueMinPoupanca & valor <= saldoPoupanca(cc) &
-            saldoCorrente(cc) + valor : NAT
+            saldoCorrente(cc) + valor : NAT 
         THEN
             ok := TRUE    
         ELSE
