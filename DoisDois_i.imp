@@ -22,8 +22,8 @@ VALUES
     jurosFatura = 2; 
     maxParcelas = 10;
     limiteMaxPadrao = 15;
-    saqueMinCorrente = 30;
-    saqueMinPoupanca = 20;
+    saqueMinCorrente = 10;
+    saqueMinPoupanca = 15;
     limitePix = 50;
     contaDummy = 0;
     cartaoDummy = 0;
@@ -337,7 +337,7 @@ passarMes = skip;
 ccs <-- consultarContas = 
     VAR ii IN
         ii := 0;
-        ccs := (0..maxConta) * {FALSE};
+        ccs := (0..maxConta)*{FALSE};
         WHILE ii <= maxConta DO
             VAR atual IN atual := i_contas(ii);
             IF 
@@ -351,7 +351,7 @@ ccs <-- consultarContas =
             ii : 0..(maxConta+1) &
             i_contas : (0..maxConta) --> STATUSCONTA &
             ccs : 0..maxConta --> BOOL &
-            dom(ccs |> {TRUE}) = dom(i_contas |> {ativa}) /\ 0..(ii-1)
+            dom(ccs |> {TRUE}) = dom((0..(ii-1) <| i_contas) |> {ativa})
         VARIANT
             maxConta - ii + 1
         END
@@ -362,6 +362,47 @@ sc, sp <-- consultarSaldos(cc) =
         sc := i_saldoCorrente(cc);
         sp := i_saldoPoupanca(cc)
     END;
+    
+hh <-- historico(cc) = 
+    VAR ii IN
+        ii := 0;
+        hh := (0..maxTransacao)*{FALSE};
+        WHILE ii <= maxTransacao DO
+            VAR 
+                atual, origem, destino, tipo 
+            IN 
+                atual := i_transacoes(ii);
+                origem := i_origem(ii);
+                destino := i_destino(ii);
+                tipo := i_tipoTransacoes(ii);
+                
+                IF
+                    atual = TRUE & 
+                    ((origem = cc & tipo /= tranDepositoCartao) or (destino = cc & tipo /= tranCredito))
+                THEN
+                    hh(ii) := TRUE
+                END;
+                
+                ii := ii + 1
+            END
+        INVARIANT
+            ii : 0..(maxTransacao + 1) &
+            i_transacoes : TRANSACAO --> BOOL &
+            i_origem : TRANSACAO --> CONTA &
+            i_destino : TRANSACAO --> CONTA &
+            i_tipoTransacoes : TRANSACAO --> TIPOTRANSACAO &
+            hh : 0..maxTransacao --> BOOL &
+            dom(hh |> {TRUE}) = dom((0..(ii-1) <| i_transacoes) |> {TRUE}) /\ 
+            ((i_origem~[{cc}] - i_tipoTransacoes~[{tranDepositoCartao}]) \/
+            (i_destino~[{cc}] -  i_tipoTransacoes~[{tranCredito}]))
+            
+        VARIANT
+            maxTransacao - ii + 1
+        END
+       
+    END;
+  
+    
     
 
 ok <-- pre_adicionarConta(cc) =
@@ -536,7 +577,21 @@ ok <-- pre_pix(co, cd, valor) = skip;
 
 ok <-- pre_compraDebito(co, cd, valor) = skip;
 
-ok <-- pre_historico(cc) = skip;
+ok <-- pre_historico(cc) = 
+    VAR 
+        statusConta
+    IN
+        statusConta := i_contas(cc);
+        
+        IF 
+            statusConta = ativa
+        THEN
+            ok := TRUE
+        ELSE
+            ok := FALSE
+        END
+        
+    END;
 
 ok <-- pre_consultarSaldos(cc) = 
     VAR 

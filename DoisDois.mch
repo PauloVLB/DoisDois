@@ -5,7 +5,7 @@ SETS
     CONTA; FATURA; CARTAO; TRANSACAO;
     STATUSFATURA = {paga, vencida, aberta};
     TIPOCARTAO = {credito, debito};
-    TIPOTRANSACAO = {saqueCorrente, saquePoupanca, depositoCorrente, depositoPoupanca, tranCredito, tranDebito, tranPix}
+    TIPOTRANSACAO = {saqueCorrente, saquePoupanca, depositoCorrente, depositoPoupanca, tranCredito, tranDebito, tranPix, tranDepositoCartao}
 
 CONSTANTS         
     taxaRendimento, jurosFatura, maxParcelas, limiteMaxPadrao, 
@@ -100,10 +100,8 @@ DEFINITIONS
         {fe | fe : faturas & faturaCartao(fe) = ct &
                               faturaOrdem(fe) : (faturaOrdem(faturaAtual(ct)) .. (faturaOrdem(faturaAtual(ct)) + parcelas - 1))};
     
-    transacoesDuplicadas(cc) == 
-        (( origemTransacoes~[{cc}] /\ tipoTransacoes~[{depositoCorrente}] ) - destinoTransacoes~[{cc}])
-        \/ (( destinoTransacoes~[{cc}] /\ tipoTransacoes~[{tranCredito}] ));
-    conjuntoHistorico(cc) == (origemTransacoes~[{cc}] \/ destinoTransacoes~[{cc}]) - transacoesDuplicadas(cc)
+    conjuntoHistorico(cc) == (origemTransacoes~[{cc}] - tipoTransacoes~[{tranDepositoCartao}])
+      \/ (destinoTransacoes~[{cc}] - tipoTransacoes~[{tranCredito}])
     
 
 INITIALISATION
@@ -303,7 +301,7 @@ compraParcelada(co, cd, valor, parcelas) =
                origemTransacoes := origemTransacoes \/ {tDestino |-> titular(co)} \/ (tOrigem * {titular(co)}) ||
                destinoTransacoes := destinoTransacoes \/ {tDestino |-> cd} \/ (tOrigem * {cd}) ||
                valorTransacoes := valorTransacoes \/ {tDestino |-> valor} \/ (tOrigem * {parcela}) ||
-               tipoTransacoes := tipoTransacoes \/ {tDestino |-> depositoCorrente} \/ (tOrigem * {tranCredito})  ||
+               tipoTransacoes := tipoTransacoes \/ {tDestino |-> tranDepositoCartao} \/ (tOrigem * {tranCredito})  ||
                saldoCorrente(cd) := saldoCorrente(cd) + valor ||
                
                limite(co) := limite(co) - parcela ||
@@ -494,6 +492,19 @@ passarMes =
     THEN
           ccs := ccList
     END;
+    
+hh <-- historico(cc) = 
+   PRE 
+       cc : CONTA & cc : contas
+   THEN
+      ANY hhList
+      WHERE
+          hhList : TRANSACAO --> BOOL &
+          dom(hhList |> {TRUE}) = conjuntoHistorico(cc)
+      THEN
+          hh := hhList
+      END
+   END;
     
 sc, sp <-- consultarSaldos(cc) = 
     PRE 
