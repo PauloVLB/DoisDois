@@ -186,7 +186,8 @@ sacarPoupanca(cc, valor) =
     PRE
         cc : CONTA & cc : contas & valor : NAT1 &
         valor >= saqueMinPoupanca & valor <= saldoPoupanca(cc) &
-        saldoCorrente(cc) + valor : NAT
+        saldoCorrente(cc) + valor : NAT &
+        TRANSACAO - transacoes /= {}
     THEN
         saldoPoupanca(cc) := saldoPoupanca(cc) - valor ||
         saldoCorrente(cc) := saldoCorrente(cc) + valor ||

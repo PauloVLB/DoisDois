@@ -156,25 +156,21 @@ sacarCorrente(cc, valor) =
                 ii := 0;
                 atual := i_transacoes(ii);
                 
-                WHILE atual = TRUE DO
+                WHILE ii < maxTransacao & atual = TRUE DO
                     ii := ii + 1;
-                    IF ii <= maxTransacao
-                    THEN
-                        atual := i_transacoes(ii)
-                    ELSE 
-                        atual := FALSE
-                    END
+                    atual := i_transacoes(ii)
+
                 INVARIANT 
-                    ii : 0..(maxTransacao + 1) &   
+                    ii : 0..maxTransacao &   
                     i_transacoes : TRANSACAO --> BOOL &
                     i_origem : TRANSACAO --> CONTA &
                     i_destino : TRANSACAO --> CONTA &
                     i_valorTransacoes : TRANSACAO --> NAT &
                     i_tipoTransacoes : TRANSACAO --> TIPOTRANSACAO &
                     (ii <= maxTransacao => atual = i_transacoes(ii)) &
-                    (0..(ii-1)) <: dom(i_transacoes |> {TRUE})
+                    (0..ii-1) <: dom(i_transacoes |> {TRUE})
                 VARIANT 
-                    maxTransacao + 1 - ii
+                    maxTransacao - ii
                 END;
                 
                 i_transacoes(ii) := TRUE;
@@ -196,37 +192,28 @@ sacarPoupanca(cc, valor) =
                 ii := 0;
                 atual := i_transacoes(ii);
                 
-                WHILE ii <= maxTransacao & atual = TRUE DO
+                WHILE ii < maxTransacao & atual = TRUE DO
                     ii := ii + 1;
-                    IF ii <= maxTransacao
-                    THEN
-                        atual := i_transacoes(ii)
-                    ELSE 
-                        atual := FALSE
-                    END
+                    atual := i_transacoes(ii)
                 INVARIANT 
-                    ii : 0..(maxTransacao + 1) &   
+                    ii : 0..maxTransacao &   
                     i_transacoes : TRANSACAO --> BOOL &
                     i_origem : TRANSACAO --> CONTA &
                     i_destino : TRANSACAO --> CONTA &
                     i_valorTransacoes : TRANSACAO --> NAT &
                     i_tipoTransacoes : TRANSACAO --> TIPOTRANSACAO &
                     (ii <= maxTransacao => atual = i_transacoes(ii)) &
-                    (0..(ii-1)) <: dom(i_transacoes |> {TRUE})
+                    (0..ii-1) <: dom(i_transacoes |> {TRUE})
                 VARIANT 
-                    maxTransacao + 1 - ii
+                    maxTransacao - ii
                 END;
-                
-                IF 
-                    ii <= maxTransacao
-                THEN
-                    i_transacoes(ii) := TRUE;
-                    i_origem(ii) := cc;
-                    i_destino(ii) := cc;
-                    i_valorTransacoes(ii) := valor;
-                    i_tipoTransacoes(ii) := saquePoupanca;
-                    tamTransacao := tamTransacao + 1
-                END
+ 
+                i_transacoes(ii) := TRUE;
+                i_origem(ii) := cc;
+                i_destino(ii) := cc;
+                i_valorTransacoes(ii) := valor;
+                i_tipoTransacoes(ii) := saquePoupanca;
+                tamTransacao := tamTransacao + 1
                 
            END  
       END;
@@ -242,15 +229,11 @@ adicionarCartao(ct, tp, cc) =
                 ii := 0;
                 atual := i_faturas(ii);
                 
-                WHILE ii <= maxFatura & atual = TRUE DO
+                WHILE ii < maxFatura & atual = TRUE DO
                     ii := ii + 1;
-                    IF ii <= maxFatura THEN
-                        atual := i_faturas(ii)
-                    ELSE
-                        atual := FALSE 
-                    END
+                    atual := i_faturas(ii)
                 INVARIANT 
-                    ii : 0..(maxFatura + 1) &
+                    ii : 0..maxFatura &
                     maxFatura : dom(i_faturas) &
                     i_faturas : FATURA --> BOOL &
                     i_faturaAtual : CARTAO --> FATURA &
@@ -259,9 +242,9 @@ adicionarCartao(ct, tp, cc) =
                     i_faturaCartao : FATURA --> CARTAO &
                     i_faturaOrdem : FATURA --> NAT &  
                     (ii <= maxFatura => atual = i_faturas(ii)) &
-                    (0..(ii-1)) <: dom(i_faturas |> {TRUE})
+                    atual = FALSE <=> (ii > maxFatura or (ii /: dom(i_transacoes |> {TRUE})))
                 VARIANT 
-                    maxFatura + 1 - ii
+                    maxFatura - ii
                 END;
                 
                 i_faturas(ii) := TRUE;
