@@ -568,7 +568,8 @@ ok <-- pre_sacarCorrente(cc, valor) =
         IF 
             cc : contas &
             valor : NAT1 &
-            valor >= saqueMinCorrente & valor <= saldoCorrente(cc)
+            valor >= saqueMinCorrente & valor <= saldoCorrente(cc) &
+            TRANSACAO - transacoes /= {}
         THEN
             ok := TRUE    
         ELSE
@@ -585,7 +586,8 @@ ok <-- pre_sacarPoupanca(cc, valor) =
             cc : contas &
             valor : NAT1 &
             valor >= saqueMinPoupanca & valor <= saldoPoupanca(cc) &
-            saldoCorrente(cc) + valor : NAT 
+            saldoCorrente(cc) + valor : NAT  &
+            TRANSACAO - transacoes /= {}
         THEN
             ok := TRUE    
         ELSE
