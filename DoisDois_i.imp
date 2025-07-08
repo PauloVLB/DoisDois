@@ -138,167 +138,321 @@ INITIALISATION
     
 
 OPERATIONS
-adicionarConta(cc) = 
+ok <-- adicionarConta(cc) = 
     BEGIN
-        i_contas(cc) := ativa;
-        i_saldoCorrente(cc) := 0;
-        i_saldoPoupanca(cc) := 0 
+        VAR
+           status
+        IN
+            status := i_contas(cc);   
+            IF 
+                cc <= maxConta & status = livre
+            THEN
+                i_contas(cc) := ativa;
+                i_saldoCorrente(cc) := 0;
+                i_saldoPoupanca(cc) := 0;
+                ok := TRUE
+            ELSE
+                ok := FALSE
+            END
+        END
+        
     END;
 
 depositarCorrente(cc, valor) = skip;
 
 depositarPoupanca(cc, valor) = skip;
 
-sacarCorrente(cc, valor) = 
-    BEGIN
-         i_saldoCorrente(cc) := i_saldoCorrente(cc) -  valor;
-         VAR ii, atual IN
-                ii := 0;
-                atual := i_transacoes(ii);
-                
-                WHILE ii < maxTransacao & atual = TRUE DO
-                    ii := ii + 1;
-                    atual := i_transacoes(ii)
+ok <-- sacarCorrente(cc, valor) = 
 
-                INVARIANT 
-                    ii : 0..maxTransacao &   
-                    i_transacoes : TRANSACAO --> BOOL &
-                    i_origem : TRANSACAO --> CONTA &
-                    i_destino : TRANSACAO --> CONTA &
-                    i_valorTransacoes : TRANSACAO --> NAT &
-                    i_tipoTransacoes : TRANSACAO --> TIPOTRANSACAO &
-                    (ii <= maxTransacao => atual = i_transacoes(ii)) &
-                    (0..ii-1) <: dom(i_transacoes |> {TRUE})
-                VARIANT 
-                    maxTransacao - ii
-                END;
-                
-                i_transacoes(ii) := TRUE;
-                i_origem(ii) := cc;
-                i_destino(ii) := cc;
-                i_valorTransacoes(ii) := valor;
-                i_tipoTransacoes(ii) := saqueCorrente;
-                tamTransacao := tamTransacao + 1
-                
-           END
-        
-    END;
- 
-sacarPoupanca(cc, valor) = 
-    BEGIN
-         i_saldoPoupanca(cc) := i_saldoPoupanca(cc) -  valor;
-         i_saldoCorrente(cc) := i_saldoCorrente(cc) + valor;
-         VAR ii, atual IN
-                ii := 0;
-                atual := i_transacoes(ii);
-                
-                WHILE ii < maxTransacao & atual = TRUE DO
-                    ii := ii + 1;
-                    atual := i_transacoes(ii)
-                INVARIANT 
-                    ii : 0..maxTransacao &   
-                    i_transacoes : TRANSACAO --> BOOL &
-                    i_origem : TRANSACAO --> CONTA &
-                    i_destino : TRANSACAO --> CONTA &
-                    i_valorTransacoes : TRANSACAO --> NAT &
-                    i_tipoTransacoes : TRANSACAO --> TIPOTRANSACAO &
-                    (ii <= maxTransacao => atual = i_transacoes(ii)) &
-                    (0..ii-1) <: dom(i_transacoes |> {TRUE})
-                VARIANT 
-                    maxTransacao - ii
-                END;
- 
-                i_transacoes(ii) := TRUE;
-                i_origem(ii) := cc;
-                i_destino(ii) := cc;
-                i_valorTransacoes(ii) := valor;
-                i_tipoTransacoes(ii) := saquePoupanca;
-                tamTransacao := tamTransacao + 1
-                
-           END  
-      END;
-    
-adicionarCartao(ct, tp, cc) =
-    BEGIN
-        i_cartoes(ct) := TRUE;
-        i_tipoCartao(ct) := tp;
-        i_titular(ct) := cc;
-        IF tp = credito THEN
-            
-            VAR ii, atual IN
-                ii := 0;
-                atual := i_faturas(ii);
-                
-                WHILE ii < maxFatura & atual = TRUE DO
-                    ii := ii + 1;
-                    atual := i_faturas(ii)
-                INVARIANT 
-                    ii : 0..maxFatura &
-                    maxFatura : dom(i_faturas) &
-                    i_faturas : FATURA --> BOOL &
-                    i_faturaAtual : CARTAO --> FATURA &
-                    i_statusFatura : FATURA --> STATUSFATURA &
-                    i_totalFatura : FATURA --> NAT &
-                    i_faturaCartao : FATURA --> CARTAO &
-                    i_faturaOrdem : FATURA --> NAT &  
-                    (ii <= maxFatura => atual = i_faturas(ii)) &
-                    atual = FALSE <=> (ii > maxFatura or (ii /: dom(i_transacoes |> {TRUE})))
-                VARIANT 
-                    maxFatura - ii
-                END;
-                
-                i_faturas(ii) := TRUE;
-                tamFatura := tamFatura + 1;
-                i_faturaAtual(ct) := ii;
-                i_statusFatura(ii) := aberta;
-                i_totalFatura(ii) := 0;
-                i_faturaCartao(ii) := ct;
-                i_faturaOrdem(ii) := 0;
-                i_limite(ct) := limiteMaxPadrao;
-                i_limiteMax(ct) := limiteMaxPadrao
-                    
-            END
-         END
-    END;
-    
-removerCartao(ct) = 
-    VAR tipo IN
-        tipo := i_tipoCartao(ct);
-        
-        i_cartoes(ct) := FALSE;
+    VAR 
+        statusConta, saldoCorrente
+    IN
+        statusConta := i_contas(cc);
+        saldoCorrente := i_saldoCorrente(cc);
         
         IF 
-            tipo = credito 
+            cc <= maxConta & statusConta = ativa & valor >= saqueMinCorrente &
+            valor <= saldoCorrente & tamTransacao <= maxTransacao &
+            valor >= 1
         THEN
-            VAR ii, fatura, cartao IN
+             i_saldoCorrente(cc) := i_saldoCorrente(cc) -  valor;
+             VAR ii, atual IN
+                    ii := 0;
+                    atual := i_transacoes(ii);
+                    
+                    WHILE ii < maxTransacao & atual = TRUE DO
+                        ii := ii + 1;
+                        atual := i_transacoes(ii)
+    
+                    INVARIANT 
+                        ii : 0..maxTransacao &   
+                        ii : TRANSACAO &
+                        i_transacoes : TRANSACAO --> BOOL &
+                        i_origem : TRANSACAO --> CONTA &
+                        i_destino : TRANSACAO --> CONTA &
+                        i_valorTransacoes : TRANSACAO --> NAT &
+                        i_tipoTransacoes : TRANSACAO --> TIPOTRANSACAO &
+                        (ii <= maxTransacao => atual = i_transacoes(ii)) &
+                        (0..ii-1) <: dom(i_transacoes |> {TRUE})
+                    VARIANT 
+                        maxTransacao - ii
+                    END;
+                    
+                    i_transacoes(ii) := TRUE;
+                    i_origem(ii) := cc;
+                    i_destino(ii) := cc;
+                    i_valorTransacoes(ii) := valor;
+                    i_tipoTransacoes(ii) := saqueCorrente;
+                    tamTransacao := tamTransacao + 1
+                    
+               END;
+               
+               ok := TRUE 
+        ELSE
+            ok := FALSE
+        END
+    END;
+   
+ 
+ok <-- sacarPoupanca(cc, valor) = 
+    VAR 
+        statusConta, saldoPoupanca, saldoCorrente, total
+    IN
+        statusConta := i_contas(cc);
+        saldoPoupanca := i_saldoPoupanca(cc);
+        saldoCorrente := i_saldoCorrente(cc);
+        total := saldoCorrente + valor;
+        
+        IF 
+            cc <= maxConta & statusConta = ativa & valor >= saqueMinPoupanca &
+            valor <= saldoPoupanca & tamTransacao <= maxTransacao &
+            valor >= 1 & total <= MAXINT
+        THEN
+            i_saldoPoupanca(cc) := i_saldoPoupanca(cc) -  valor;
+            i_saldoCorrente(cc) := i_saldoCorrente(cc) + valor;
+             VAR ii, atual IN
+                    ii := 0;
+                    atual := i_transacoes(ii);
+                    
+                    WHILE ii < maxTransacao & atual = TRUE DO
+                        ii := ii + 1;
+                        atual := i_transacoes(ii)
+                    INVARIANT 
+                        ii : 0..maxTransacao &   
+                        i_transacoes : TRANSACAO --> BOOL &
+                        i_origem : TRANSACAO --> CONTA &
+                        i_destino : TRANSACAO --> CONTA &
+                        i_valorTransacoes : TRANSACAO --> NAT &
+                        i_tipoTransacoes : TRANSACAO --> TIPOTRANSACAO &
+                        (ii <= maxTransacao => atual = i_transacoes(ii)) &
+                        (0..ii-1) <: dom(i_transacoes |> {TRUE})
+                    VARIANT 
+                        maxTransacao - ii
+                    END;
+     
+                    i_transacoes(ii) := TRUE;
+                    i_origem(ii) := cc;
+                    i_destino(ii) := cc;
+                    i_valorTransacoes(ii) := valor;
+                    i_tipoTransacoes(ii) := saquePoupanca;
+                    tamTransacao := tamTransacao + 1
+               END;
+               ok := TRUE
+        ELSE
+            ok := FALSE
+        END
+    END;    
+  
+    
+ok <-- adicionarCartao(ct, tp, cc) =
+    VAR 
+        statusConta, statusCartao,
+        cartaoDuplicado, temFatura
+    IN 
+        // verificar se conta é ativa e se cartão já foi adicionado
+        statusConta := i_contas(cc) ;
+        statusCartao := i_cartoes(ct);
+        temFatura := bool(tp = debito or tamFatura <= maxFatura);
+        
+        IF 
+            ct <= maxCartao & statusCartao = FALSE or statusConta = ativa or temFatura = TRUE
+        THEN
+            cartaoDuplicado := FALSE;
+            VAR ii IN
                 ii := 0;
                 
-                WHILE ii <= maxFatura DO
+                WHILE 
+                    ii <= maxCartao & ii <= maxConta & cartaoDuplicado = FALSE 
+                DO
+                    VAR 
+                        cartaoAtual, titularAtual, tipoAtual
+                    IN
+                        cartaoAtual := i_cartoes(ii);
+                        titularAtual := i_titular(ii);
+                        tipoAtual := i_tipoCartao(ii);
+
+                        IF cartaoAtual = TRUE & titularAtual = cc & tipoAtual = tp 
+                        THEN
+                            cartaoDuplicado := TRUE
+                        END
+                    END;
+                ii := ii + 1
+                INVARIANT 
+                    ii : NAT & ii <= (maxConta + 1) & ii <= (maxCartao + 1) &
+                    i_cartoes : CARTAO --> BOOL &
+                    i_titular : CARTAO --> CONTA &
+                    i_faturas : FATURA --> BOOL &
+                    i_tipoCartao : CARTAO --> TIPOCARTAO &
+                    (cartaoDuplicado = FALSE) => 
+                    (!jj.(jj:0..ii-1 & jj : dom(i_cartoes) => not(i_cartoes(jj) = TRUE & i_titular(jj) = cc & i_tipoCartao(jj) = tp)))
+                VARIANT
+                    (maxCartao + 1) - ii
+                END
+             END;
+             
+             
+             IF 
+                 cartaoDuplicado = FALSE
+             THEN
+                 i_cartoes(ct) := TRUE;
+                 i_tipoCartao(ct) := tp;
+                 i_titular(ct) := cc;
+                 
+                 ok := TRUE;
+                 
+                 IF 
+                     tp = credito
+                 THEN
+                     VAR ii, atual IN
+                        ii := 0;
+                        atual := i_faturas(ii);
+                    
+                        WHILE ii < maxFatura & atual = TRUE DO
+                            ii := ii + 1;
+                            atual := i_faturas(ii)
+                        INVARIANT 
+                            ii : 0..maxFatura &
+                            i_faturas : FATURA --> BOOL &
+                            i_faturaAtual : CARTAO --> FATURA &
+                            i_statusFatura : FATURA --> STATUSFATURA &
+                            i_totalFatura : FATURA --> NAT &
+                            i_faturaCartao : FATURA --> CARTAO &
+                            i_faturaOrdem : FATURA --> NAT &  
+                            (ii <= maxFatura => atual = i_faturas(ii)) &
+                            (0..ii-1) <: dom(i_transacoes |> {TRUE})
+                        VARIANT 
+                            maxFatura - ii
+                        END;
+                    
+                        i_faturas(ii) := TRUE;
+                        tamFatura := tamFatura + 1;
+                        i_faturaAtual(ct) := ii;
+                        i_statusFatura(ii) := aberta;
+                        i_totalFatura(ii) := 0;
+                        i_faturaCartao(ii) := ct;
+                        i_faturaOrdem(ii) := 0;
+                        i_limite(ct) := limiteMaxPadrao;
+                        i_limiteMax(ct) := limiteMaxPadrao 
+                      END
+                 END
+             ELSE
+                 ok := FALSE
+             END
+         ELSE
+             ok := FALSE
+         END
+     END;
+                 
+        
+      
+           
+ok <-- removerCartao(ct) = 
+    VAR 
+        cartaoAtivo, tipoCartao, pagas
+    IN 
+        cartaoAtivo := i_cartoes(ct);
+        tipoCartao := i_tipoCartao(ct);
+        
+       IF 
+           cartaoAtivo = TRUE & tipoCartao = credito
+       THEN
+        
+            VAR ii, fatura, faturaCartao, statusFatura, totalFatura
+            IN 
+                ii := 0;
+                pagas := TRUE;
+                WHILE ii <= maxFatura & pagas = TRUE DO
                     fatura := i_faturas(ii);
-                    cartao := i_faturaCartao(ii);
-                    IF 
-                        fatura = TRUE & cartao = ct
+                    faturaCartao := i_faturaCartao(ii);
+                    statusFatura := i_statusFatura(ii);
+                    totalFatura := i_totalFatura(ii);
+                    
+                    IF fatura = TRUE & faturaCartao = ct & statusFatura /= paga & totalFatura /= 0
                     THEN 
-                        i_faturas(ii) := FALSE;
-                        tamFatura := tamFatura - 1
-                    END; // DO IF INTERNO
+                       pagas := FALSE
+                    END;
                     ii := ii + 1
                 INVARIANT
                     ii : 0..(maxFatura + 1) &
-                    i_faturas : FATURA --> BOOL &
+                    i_faturaCartao : FATURA --> CARTAO &
                     i_statusFatura : FATURA --> STATUSFATURA &
                     i_totalFatura : FATURA --> NAT &
-                    i_faturaCartao : FATURA --> CARTAO &
-                    i_faturaOrdem : FATURA --> NAT &
-                    TRUE /: ran(dom((0..(ii-1) <| i_faturaCartao) |> {ct}) <| i_faturas)
-                    // o que espero no final: ran(dom(i_faturaCartao |> {ct}) <| i_faturas) = {FALSE}
-
-                VARIANT
-                    maxFatura + 1 - ii
+                    pagas = TRUE <=> (dom(((0..(ii-1)) <| i_faturas |> {TRUE})) /\ dom(i_faturaCartao |> {ct}) <: dom(i_statusFatura |> {paga}) \/ dom(i_totalFatura |> {0}))
+                VARIANT 
+                    maxFatura - ii + 1
+                    
+                END // WHILE
+            END;
+            
+            IF 
+                pagas = TRUE
+                
+            THEN
+                
+                 VAR ii, fatura, cartao IN
+                    ii := 0;
+                    
+                    WHILE ii <= maxFatura DO
+                        fatura := i_faturas(ii);
+                        cartao := i_faturaCartao(ii);
+                        IF 
+                            fatura = TRUE & cartao = ct
+                        THEN 
+                            i_faturas(ii) := FALSE;
+                            tamFatura := tamFatura - 1
+                        END; // DO IF INTERNO
+                        ii := ii + 1
+                    INVARIANT
+                        ii : 0..(maxFatura + 1) &
+                        i_faturas : FATURA --> BOOL &
+                        i_statusFatura : FATURA --> STATUSFATURA &
+                        i_totalFatura : FATURA --> NAT &
+                        i_faturaCartao : FATURA --> CARTAO &
+                        i_faturaOrdem : FATURA --> NAT &
+                        TRUE /: ran(dom((0..(ii-1) <| i_faturaCartao) |> {ct}) <| i_faturas)
+                        // o que espero no final: ran(dom(i_faturaCartao |> {ct}) <| i_faturas) = {FALSE}
+                    VARIANT
+                        maxFatura + 1 - ii
+                    END 
                 END 
-            END 
-        END 
-    END;
+            END;
+            
+            i_cartoes(ct) := FALSE;
+            i_bloqueados(ct) := FALSE;  
+            
+            ok := pagas    
+        ELSIF 
+            cartaoAtivo = TRUE & tipoCartao = debito
+        THEN 
+            i_cartoes(ct) := FALSE;
+            i_bloqueados(ct) := FALSE;  
+            ok := TRUE
+        ELSE 
+            ok := FALSE
+        END
+            
+        END;
+
 
 pagarFatura(cc, ff) = skip;
 
@@ -344,218 +498,84 @@ ccs <-- consultarContas =
         END
     END;
 
-sc, sp <-- consultarSaldos(cc) = 
-    BEGIN 
-        sc := i_saldoCorrente(cc);
-        sp := i_saldoPoupanca(cc)
+sc, sp, ok <-- consultarSaldos(cc) = 
+    VAR 
+        statusConta
+    IN
+        statusConta := i_contas(cc);
+        
+        IF 
+            statusConta = ativa
+        THEN
+            sc := i_saldoCorrente(cc);
+            sp := i_saldoPoupanca(cc);
+            ok := TRUE
+        ELSE
+            ok := FALSE
+        END  
     END;
-    
-hh <-- historico(cc) = 
-    VAR ii IN
-        ii := 0;
-        hh := (0..maxTransacao)*{FALSE};
-        WHILE ii <= maxTransacao DO
-            VAR 
-                atual, origem, destino, tipo 
-            IN 
-                atual := i_transacoes(ii);
-                origem := i_origem(ii);
-                destino := i_destino(ii);
-                tipo := i_tipoTransacoes(ii);
-                
-                IF
-                    atual = TRUE & 
-                    ((origem = cc & tipo /= tranDepositoCartao) or (destino = cc & tipo /= tranCredito))
-                THEN
-                    hh(ii) := TRUE
-                END;
-                
-                ii := ii + 1
-            END
-        INVARIANT
-            ii : 0..(maxTransacao + 1) &
-            i_transacoes : TRANSACAO --> BOOL &
-            i_origem : TRANSACAO --> CONTA &
-            i_destino : TRANSACAO --> CONTA &
-            i_tipoTransacoes : TRANSACAO --> TIPOTRANSACAO &
-            hh : 0..maxTransacao --> BOOL &
-            dom(hh |> {TRUE}) = dom((0..(ii-1) <| i_transacoes) |> {TRUE}) /\ 
-            ((i_origem~[{cc}] - i_tipoTransacoes~[{tranDepositoCartao}]) \/
-            (i_destino~[{cc}] -  i_tipoTransacoes~[{tranCredito}]))
+   
+hh, ok <-- historico(cc) = 
+    VAR 
+        statusConta
+    IN
+        statusConta := i_contas(cc);
+        
+        IF 
+            statusConta = ativa
+        THEN
             
-        VARIANT
-            maxTransacao - ii + 1
+             VAR ii IN
+                ii := 0;
+                hh := (0..maxTransacao)*{FALSE};
+                WHILE ii <= maxTransacao DO
+                    VAR 
+                        atual, origem, destino, tipo 
+                    IN 
+                        atual := i_transacoes(ii);
+                        origem := i_origem(ii);
+                        destino := i_destino(ii);
+                        tipo := i_tipoTransacoes(ii);
+                        
+                        IF
+                            atual = TRUE & 
+                            ((origem = cc & tipo /= tranDepositoCartao) or (destino = cc & tipo /= tranCredito))
+                        THEN
+                            hh(ii) := TRUE
+                        END;
+                        
+                        ii := ii + 1
+                    END
+                INVARIANT
+                    ii : 0..(maxTransacao + 1) &
+                    i_transacoes : TRANSACAO --> BOOL &
+                    i_origem : TRANSACAO --> CONTA &
+                    i_destino : TRANSACAO --> CONTA &
+                    i_tipoTransacoes : TRANSACAO --> TIPOTRANSACAO &
+                    hh : 0..maxTransacao --> BOOL &
+                    dom(hh |> {TRUE}) = dom((0..(ii-1) <| i_transacoes) |> {TRUE}) /\ 
+                    ((i_origem~[{cc}] - i_tipoTransacoes~[{tranDepositoCartao}]) \/
+                    (i_destino~[{cc}] -  i_tipoTransacoes~[{tranCredito}]))
+                    
+                VARIANT
+                    maxTransacao - ii + 1
+                END
+               
+            END;
+            ok := TRUE
+        ELSE
+            ok := FALSE
         END
-       
+        
     END;
-  
-    
     
 
-ok <-- pre_adicionarConta(cc) =
-    VAR
-        status
-    IN
-        status := i_contas(cc);
-        ok := bool(status = livre)
-    END;
     
+
 ok <-- pre_depositarCorrente(cc, valor) = skip;
 
 ok <-- pre_depositarPoupanca(cc, valor) = skip;
-
-ok <-- pre_sacarCorrente(cc, valor) = 
-    VAR 
-        statusConta, saldoCorrente
-    IN
-        statusConta := i_contas(cc);
-        saldoCorrente := i_saldoCorrente(cc);
-        
-        IF 
-            statusConta = ativa & valor >= saqueMinCorrente &
-            valor <= saldoCorrente & tamTransacao < maxTransacao &
-            valor >= 1
-        THEN
-            ok := TRUE
-        ELSE
-            ok := FALSE
-        END
-    END;
-
-ok <-- pre_sacarPoupanca(cc, valor) = 
-    VAR 
-        statusConta, saldoPoupanca, saldoCorrente, total
-    IN
-        statusConta := i_contas(cc);
-        saldoPoupanca := i_saldoPoupanca(cc);
-        saldoCorrente := i_saldoCorrente(cc);
-        total := saldoCorrente + valor;
-        
-        IF 
-            statusConta = ativa & valor >= saqueMinPoupanca &
-            valor <= saldoPoupanca & tamTransacao < maxTransacao &
-            valor >= 1 & total <= MAXINT
-        THEN
-            ok := TRUE
-        ELSE
-            ok := FALSE
-        END
-    END;    
-
-ok <-- pre_adicionarCartao(ct, tp, cc) = 
-    VAR 
-        cartaoLivre,
-        statusConta, statusCartao,
-        cartaoDuplicado, temFatura
-    IN 
-        // verificar se conta é ativa e se cartão já foi adicionado
-        statusConta := i_contas(cc) ;
-        statusCartao := i_cartoes(ct);
-        cartaoLivre := bool(statusCartao = FALSE);
-        temFatura := bool(tp = debito or tamFatura < maxFatura);
-        
-        IF 
-            tp = credito & cartaoLivre = TRUE & statusConta = ativa & temFatura = TRUE
-        THEN
-        
-            // verificar se titular já tem um cartão desse tipo
-            cartaoDuplicado := FALSE;
-            VAR ii IN
-                ii := 0;
-                
-                WHILE 
-                    ii <= maxCartao & ii <= maxConta & cartaoDuplicado = FALSE 
-                DO
-                    VAR 
-                        cartaoAtual, titularAtual, tipoAtual
-                    IN
-                        cartaoAtual := i_cartoes(ii);
-                        titularAtual := i_titular(ii);
-                        tipoAtual := i_tipoCartao(ii);
-
-                        IF cartaoAtual = TRUE & titularAtual = cc & tipoAtual = tp 
-                        THEN
-                            cartaoDuplicado := TRUE
-                        END
-                    END;
-                ii := ii + 1
-                INVARIANT 
-                    ii : NAT & ii <= (maxConta + 1) & ii <= (maxCartao + 1) &
-                    i_cartoes : CARTAO --> BOOL &
-                    i_titular : CARTAO --> CONTA &
-                    i_tipoCartao : CARTAO --> TIPOCARTAO &
-                    (cartaoDuplicado = FALSE) => 
-                    (!jj.(jj:0..ii-1 => not(i_cartoes(jj) = TRUE & i_titular(jj) = cc & i_tipoCartao(jj) = tp)))
-                VARIANT
-                    (maxCartao + 1) - ii
-                END;
-                
-                IF 
-                    cartaoDuplicado = TRUE
-                THEN
-                    ok := FALSE
-                ELSE
-                    ok := TRUE
-                END
-                
-                
-             END
-                
-           ELSIF 
-               statusConta = ativa & cartaoLivre = TRUE 
-           THEN
-                ok := TRUE
-           ELSE
-                ok := FALSE
-           END  
-    END;
-    
-
-ok <-- pre_removerCartao(ct) = 
-    VAR 
-        cartaoAtivo, tipoCartao, pagas
-    IN 
-        cartaoAtivo := i_cartoes(ct);
-        tipoCartao := i_tipoCartao(ct);
-        
-       IF 
-           cartaoAtivo = TRUE & tipoCartao = credito
-       THEN
-        
-            VAR ii, fatura, faturaCartao, statusFatura, totalFatura
-            IN 
-                ii := 0;
-                pagas := TRUE;
-                WHILE ii <= maxFatura & pagas = TRUE DO
-                    fatura := i_faturas(ii);
-                    faturaCartao := i_faturaCartao(ii);
-                    statusFatura := i_statusFatura(ii);
-                    totalFatura := i_totalFatura(ii);
-                    
-                    IF fatura = TRUE & faturaCartao = ct & statusFatura /= paga & totalFatura /= 0
-                    THEN 
-                       pagas := FALSE
-                    END;
-                    ii := ii + 1
-                INVARIANT
-                    ii : 0..(maxFatura + 1) &
-                    i_faturaCartao : FATURA --> CARTAO &
-                    i_statusFatura : FATURA --> STATUSFATURA &
-                    i_totalFatura : FATURA --> NAT &
-                    pagas = TRUE <=> (dom(((0..(ii-1)) <| i_faturas |> {TRUE})) /\ dom(i_faturaCartao |> {ct}) <: dom(i_statusFatura |> {paga}) \/ dom(i_totalFatura |> {0}))
-                VARIANT 
-                    maxFatura - ii + 1
-                    
-                END // WHILE
-            END;
-            
-            ok := pagas
-        ELSE 
-            ok := cartaoAtivo
-        END
-            
-        END;
-
+  
 ok <-- pre_pagarFatura(cc, ff) = skip;
 
 ok <-- pre_compraParcelada(co, cd, valor, parcelas) = skip;
@@ -563,38 +583,6 @@ ok <-- pre_compraParcelada(co, cd, valor, parcelas) = skip;
 ok <-- pre_pix(co, cd, valor) = skip;
 
 ok <-- pre_compraDebito(co, cd, valor) = skip;
-
-ok <-- pre_historico(cc) = 
-    VAR 
-        statusConta
-    IN
-        statusConta := i_contas(cc);
-        
-        IF 
-            statusConta = ativa
-        THEN
-            ok := TRUE
-        ELSE
-            ok := FALSE
-        END
-        
-    END;
-
-ok <-- pre_consultarSaldos(cc) = 
-    VAR 
-        statusConta
-    IN
-        statusConta := i_contas(cc);
-        
-        IF 
-            statusConta = ativa
-        THEN
-            ok := TRUE
-        ELSE
-            ok := FALSE
-        END
-        
-    END;
 
 ok <-- pre_bloquearCartao(ct) = skip;
 

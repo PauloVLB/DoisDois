@@ -115,15 +115,20 @@ INITIALISATION
     
 OPERATIONS 
     
-adicionarConta(cc) =
+ok <-- adicionarConta(cc) =
     PRE
-        cc : CONTA &
-        cc /: contas &
-        cc /: contasRemovidas
+        cc : CONTA 
     THEN
-        contas := contas \/ {cc} ||
-        saldoCorrente(cc) := 0 ||
-        saldoPoupanca(cc) := 0 
+        IF 
+            cc /: contas & cc /: contasRemovidas
+        THEN
+            contas := contas \/ {cc} ||
+            saldoCorrente(cc) := 0 ||
+            saldoPoupanca(cc) := 0 ||
+            ok := TRUE
+        ELSE
+            ok := FALSE
+        END
     END;
 
 depositarCorrente(cc, valor) =
@@ -162,99 +167,125 @@ depositarPoupanca(cc, valor) =
         END
     END;
         
-sacarCorrente(cc, valor) =
+ok <-- sacarCorrente(cc, valor) =
     PRE 
-        cc : CONTA & cc: contas & valor : NAT1 &
-        valor >= saqueMinCorrente & valor <= saldoCorrente(cc) &
-        TRANSACAO - transacoes /= {}
+        cc : CONTA & valor : NAT
     THEN 
-        saldoCorrente(cc) := saldoCorrente(cc) - valor ||
-        ANY 
-            tt 
-        WHERE 
-            tt : TRANSACAO & tt /: transacoes
+        IF cc: contas & valor >= 1 & valor >= saqueMinCorrente & 
+            valor <= saldoCorrente(cc) & TRANSACAO - transacoes /= {}
         THEN
-            transacoes := transacoes \/ {tt} ||
-            origemTransacoes(tt) := cc ||
-            destinoTransacoes(tt) := cc ||
-            valorTransacoes(tt) := valor ||
-            tipoTransacoes(tt) := saqueCorrente
+            saldoCorrente(cc) := saldoCorrente(cc) - valor ||
+            ANY 
+                tt 
+            WHERE 
+                tt : TRANSACAO & tt /: transacoes
+            THEN
+                transacoes := transacoes \/ {tt} ||
+                origemTransacoes(tt) := cc ||
+                destinoTransacoes(tt) := cc ||
+                valorTransacoes(tt) := valor ||
+                tipoTransacoes(tt) := saqueCorrente 
+            END ||
+            ok := TRUE
+        ELSE
+            ok := FALSE
         END
     END;
 
-sacarPoupanca(cc, valor) =
+ok <-- sacarPoupanca(cc, valor) =
     PRE
-        cc : CONTA & cc : contas & valor : NAT1 &
-        valor >= saqueMinPoupanca & valor <= saldoPoupanca(cc) &
-        saldoCorrente(cc) + valor : NAT &
-        TRANSACAO - transacoes /= {}
+        cc : CONTA & valor : NAT
     THEN
-        saldoPoupanca(cc) := saldoPoupanca(cc) - valor ||
-        saldoCorrente(cc) := saldoCorrente(cc) + valor ||
-        ANY
-            tt
-        WHERE
-            tt : TRANSACAO & tt /: transacoes
+        IF 
+            cc : contas & valor >= 1 & valor >= saqueMinPoupanca &
+            valor <= saldoPoupanca(cc) & saldoCorrente(cc) + valor : NAT & 
+            TRANSACAO - transacoes /= {}
         THEN
-           transacoes := transacoes \/ {tt} ||
-           origemTransacoes(tt) := cc ||
-           destinoTransacoes(tt) := cc ||
-           valorTransacoes(tt) := valor ||
-           tipoTransacoes(tt) := saquePoupanca
-       END
-    END;
-    
-adicionarCartao(ct, tp, cc) =
-    PRE
-        ct : CARTAO & ct /: cartoes & tp : TIPOCARTAO & cc : CONTA & 
-        cc : contas & tipoCartao~[{tp}] /\ titular~[{cc}] = {} & 
-        (tp = credito => (FATURA - faturas /= {}))
-    THEN
-        cartoes := cartoes \/ {ct} ||
-        tipoCartao(ct) := tp ||
-        titular(ct) := cc ||
-      IF 
-          tp = credito
-      THEN
-          limiteMax(ct) := limiteMaxPadrao ||
-          limite(ct) := limiteMaxPadrao ||
-          ANY 
-              ff 
-          WHERE 
-              ff : FATURA - faturas 
-          THEN
-              faturas := faturas \/ {ff} ||
-              faturaAtual(ct) := ff  ||
-              statusFatura(ff) := aberta ||
-              totalFatura(ff) := 0 ||   
-              faturaCartao(ff) := ct || 
-	          faturaOrdem(ff) := 0 
-          END
-      END
-    END;
-    
-removerCartao(ct) =
-    PRE
-        ct : CARTAO & ct : cartoes & (tipoCartao(ct) = credito => dom(faturaCartao |> {ct}) <: (dom(statusFatura |> {paga}) \/ dom (totalFatura  |> {0})))
-    THEN
-        cartoes := cartoes - {ct} ||
-        bloqueados := cartoes - {ct} ||
-        tipoCartao := {ct} <<| tipoCartao ||
-        titular := {ct} <<| titular ||
-        LET 
-            faturasCartao 
-        BE 
-            faturasCartao = faturaCartao~[{ct}] 
-        IN
-            limite := {ct} <<| limite ||
-            limiteMax := {ct} <<| limiteMax ||
-            faturas := faturas - faturasCartao ||
-            statusFatura := faturasCartao <<| statusFatura ||
-            totalFatura := faturasCartao <<| totalFatura ||
-            faturaCartao := faturasCartao <<| faturaCartao ||
-            faturaOrdem := faturasCartao <<| faturaOrdem ||
-            faturaAtual := {ct} <<| faturaAtual 
+            
+            saldoPoupanca(cc) := saldoPoupanca(cc) - valor ||
+            saldoCorrente(cc) := saldoCorrente(cc) + valor ||
+            ANY
+                tt
+            WHERE
+                tt : TRANSACAO & tt /: transacoes
+            THEN
+               transacoes := transacoes \/ {tt} ||
+               origemTransacoes(tt) := cc ||
+               destinoTransacoes(tt) := cc ||
+               valorTransacoes(tt) := valor ||
+               tipoTransacoes(tt) := saquePoupanca
+           END ||
+           ok := TRUE
+        ELSE
+           ok := FALSE
         END
+    END;
+    
+ok <-- adicionarCartao(ct, tp, cc) =
+    PRE
+        ct : CARTAO & tp : TIPOCARTAO & cc : CONTA
+    THEN
+        IF 
+           ct /: cartoes & cc : contas & tipoCartao~[{tp}] /\ titular~[{cc}] = {} & 
+        (tp = credito => (FATURA - faturas /= {}))
+        
+        THEN
+            cartoes := cartoes \/ {ct} ||
+            tipoCartao(ct) := tp ||
+            titular(ct) := cc ||
+          IF 
+              tp = credito
+          THEN
+              limiteMax(ct) := limiteMaxPadrao ||
+              limite(ct) := limiteMaxPadrao ||
+              ANY 
+                  ff 
+              WHERE 
+                  ff : FATURA - faturas 
+              THEN
+                  faturas := faturas \/ {ff} ||
+                  faturaAtual(ct) := ff  ||
+                  statusFatura(ff) := aberta ||
+                  totalFatura(ff) := 0 ||   
+                  faturaCartao(ff) := ct || 
+    	          faturaOrdem(ff) := 0 
+              END
+          END ||
+              ok := TRUE
+         ELSE
+             ok := FALSE
+         END
+    END;
+    
+ok <-- removerCartao(ct) =
+    PRE
+        ct : CARTAO 
+    THEN
+        IF  
+            ct : cartoes & (tipoCartao(ct) = credito => dom(faturaCartao |> {ct}) <: (dom(statusFatura |> {paga}) \/ dom (totalFatura  |> {0})))
+        THEN
+            cartoes := cartoes - {ct} ||
+            bloqueados := cartoes - {ct} ||
+            tipoCartao := {ct} <<| tipoCartao ||
+            titular := {ct} <<| titular ||
+            LET 
+                faturasCartao 
+            BE 
+                faturasCartao = faturaCartao~[{ct}] 
+            IN
+                limite := {ct} <<| limite ||
+                limiteMax := {ct} <<| limiteMax ||
+                faturas := faturas - faturasCartao ||
+                statusFatura := faturasCartao <<| statusFatura ||
+                totalFatura := faturasCartao <<| totalFatura ||
+                faturaCartao := faturasCartao <<| faturaCartao ||
+                faturaOrdem := faturasCartao <<| faturaOrdem ||
+                faturaAtual := {ct} <<| faturaAtual 
+            END ||
+            ok := TRUE
+           ELSE
+            ok := FALSE
+           END
      END;
      
 pagarFatura(cc, ff) = 
@@ -342,7 +373,7 @@ compraDebito(co, cd, valor) =
         co : CARTAO & cd : CONTA &
         co : debitos & co /: bloqueados &
         cd : contas & valor : 1..saldoCorrente(titular(co)) & saldoCorrente(cd) + valor : NAT &
-        titular(co) /= cd
+        titular(co) /= cd & TRANSACAO - transacoes /= {}
     THEN
        saldoCorrente := saldoCorrente <+ {titular(co) |-> saldoCorrente(titular(co)) - valor, cd |-> saldoCorrente(cd) + valor} ||
         ANY
@@ -494,42 +525,41 @@ passarMes =
           ccs := ccList
     END;
     
-hh <-- historico(cc) = 
+hh, ok <-- historico(cc) = 
    PRE 
-       cc : CONTA & cc : contas
+       cc : CONTA 
    THEN
-      ANY hhList
-      WHERE
-          hhList : TRANSACAO --> BOOL &
-          dom(hhList |> {TRUE}) = conjuntoHistorico(cc)
+      IF 
+          cc : contas
       THEN
-          hh := hhList
-      END
+          ANY hhList
+          WHERE
+              hhList : TRANSACAO --> BOOL &
+              dom(hhList |> {TRUE}) = conjuntoHistorico(cc)
+          THEN
+              hh := hhList
+          END ||
+          ok := TRUE
+       ELSE
+           ok := FALSE
+       END
    END;
     
-sc, sp <-- consultarSaldos(cc) = 
+sc, sp, ok <-- consultarSaldos(cc) = 
     PRE 
-        cc : CONTA & cc : contas
+        cc : CONTA 
     THEN
-        sc := saldoCorrente(cc) || sp := saldoPoupanca(cc)
+        IF 
+            cc : contas 
+        THEN
+            sc := saldoCorrente(cc) || sp := saldoPoupanca(cc) || ok := TRUE
+        ELSE 
+            ok := FALSE
+        END
     END;
     
 /* --- operações para confirmar pré-condição ---*/
 
-ok <-- pre_adicionarConta(cc) =
-    PRE
-        cc : CONTA
-    THEN
-        IF 
-            cc /: contas &
-            cc /: contasRemovidas
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-        
-    END;
 
 ok <-- pre_depositarCorrente(cc, valor) =
     PRE
@@ -562,74 +592,6 @@ ok <-- pre_depositarPoupanca(cc, valor) =
         
     END;
 
-ok <-- pre_sacarCorrente(cc, valor) =
-    PRE
-        cc : CONTA & valor : NAT
-    THEN
-        IF 
-            cc : contas &
-            valor : NAT1 &
-            valor >= saqueMinCorrente & valor <= saldoCorrente(cc) &
-            TRANSACAO - transacoes /= {}
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-        
-    END;
-
-ok <-- pre_sacarPoupanca(cc, valor) =
-    PRE
-        cc : CONTA & valor : NAT
-    THEN
-        IF 
-            cc : contas &
-            valor : NAT1 &
-            valor >= saqueMinPoupanca & valor <= saldoPoupanca(cc) &
-            saldoCorrente(cc) + valor : NAT  &
-            TRANSACAO - transacoes /= {}
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-        
-    END;
-
-ok <-- pre_adicionarCartao(ct, tp, cc) =
-    PRE
-        ct : CARTAO & tp : TIPOCARTAO & cc : CONTA
-    THEN
-        IF 
-            ct /: cartoes &
-            cc : contas &
-            tipoCartao~[{tp}] /\ titular~[{cc}] = {} &
-             (tp = credito => (FATURA - faturas /= {}))
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-        
-    END;
-
-ok <-- pre_removerCartao(ct) =
-    PRE
-        ct : CARTAO
-    THEN
-        IF 
-            ct : cartoes &
-            ((tipoCartao(ct) = credito) => 
-                (faturaCartao~[{ct}] <: statusFatura~[{paga}] \/ totalFatura~[{0}])
-            )
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-        
-    END;
 
 ok <-- pre_pagarFatura(cc, ff) =
     PRE
@@ -710,33 +672,6 @@ ok <-- pre_compraDebito(co, cd, valor) =
 
     END;
 
-ok <-- pre_historico(cc) =
-    PRE
-        cc : CONTA
-    THEN
-        IF 
-            cc : contas
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-
-    END;
-
-ok <-- pre_consultarSaldos(cc) =
-    PRE
-        cc : CONTA
-    THEN
-        IF 
-            cc : contas
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-
-    END;
 
 ok <-- pre_bloquearCartao(ct) =
     PRE
