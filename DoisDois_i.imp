@@ -189,10 +189,6 @@ ok <-- sacarCorrente(cc, valor) =
                         ii : TRANSACAO &
                         i_transacoes : TRANSACAO --> BOOL &
                         transacoes = dom(i_transacoes |> {TRUE}) &
-                        i_origem : TRANSACAO --> CONTA &
-                        i_destino : TRANSACAO --> CONTA &
-                        i_valorTransacoes : TRANSACAO --> NAT &
-                        i_tipoTransacoes : TRANSACAO --> TIPOTRANSACAO &
                         (0..ii-1) <: dom(i_transacoes |> {TRUE}) &
                         (atual = FALSE => (ii : TRANSACAO & ii /: transacoes))
                     VARIANT 
@@ -242,10 +238,6 @@ ok <-- sacarPoupanca(cc, valor) =
                         ii : 0..maxTransacao &   
                         i_transacoes : TRANSACAO --> BOOL &
                         transacoes = dom(i_transacoes |> {TRUE}) &
-                        i_origem : TRANSACAO --> CONTA &
-                        i_destino : TRANSACAO --> CONTA &
-                        i_valorTransacoes : TRANSACAO --> NAT &
-                        i_tipoTransacoes : TRANSACAO --> TIPOTRANSACAO &
                         (0..ii-1) <: dom(i_transacoes |> {TRUE}) &
                         (atual = FALSE => (ii : TRANSACAO & ii /: transacoes))
                     VARIANT 
@@ -485,7 +477,57 @@ ok <-- pagarFatura(cc, ff) =
 
 compraParcelada(co, cd, valor, parcelas) = skip;
 
-pix(co, cd, valor) = skip;
+ok <-- pix(co, cd, valor) = 
+    VAR 
+        contaOrigem, contaDestino, saldo, total
+    IN
+        contaOrigem := i_contas(co);
+        contaDestino := i_contas(cd);
+        saldo := i_saldoCorrente(co);
+        total := valor + saldo;
+        
+        IF 
+            contaOrigem = ativa & contaDestino = ativa &
+            valor >= 1 & valor <= saldo & total < MAXINT &
+            valor <= limitePix & co /= contaDummy & cd /= contaDummy &
+            tamTransacao < maxTransacao
+        THEN
+            
+            VAR ii, atual IN
+                    ii := 0;
+                    atual := i_transacoes(ii);
+                    
+                    WHILE ii < maxTransacao & atual = TRUE DO
+                        ii := ii + 1;
+                        atual := i_transacoes(ii)
+    
+                    INVARIANT 
+                        ii : 0..maxTransacao &   
+                        ii : TRANSACAO &
+                        i_transacoes : TRANSACAO --> BOOL &
+                        transacoes = dom(i_transacoes |> {TRUE}) &
+                        (0..ii-1) <: dom(i_transacoes |> {TRUE}) &
+                        (atual = FALSE => (ii : TRANSACAO & ii /: transacoes))
+                    VARIANT 
+                        maxTransacao - ii
+                    END;
+                    
+                    i_saldoCorrente(co) := i_saldoCorrente(co) - valor;
+                    
+                    i_transacoes(ii) := TRUE;
+                    i_origem(ii) := co;
+                    i_destino(ii) := cd;
+                    i_valorTransacoes(ii) := valor;
+                    i_tipoTransacoes(ii) := tranPix;
+                    tamTransacao := tamTransacao + 1;
+                    
+                    ok := TRUE
+                END
+            
+        ELSE
+            ok := FALSE
+        END
+    END;
 
 
 ok <-- compraDebito(co, cd, valor) = 
@@ -521,10 +563,6 @@ ok <-- compraDebito(co, cd, valor) =
                         ii : TRANSACAO &
                         i_transacoes : TRANSACAO --> BOOL &
                         transacoes = dom(i_transacoes |> {TRUE}) &
-                        i_origem : TRANSACAO --> CONTA &
-                        i_destino : TRANSACAO --> CONTA &
-                        i_valorTransacoes : TRANSACAO --> NAT &
-                        i_tipoTransacoes : TRANSACAO --> TIPOTRANSACAO &
                         (0..ii-1) <: dom(i_transacoes |> {TRUE}) &
                         (atual = FALSE => (ii : TRANSACAO & ii /: transacoes))
                     VARIANT 
@@ -786,10 +824,31 @@ ok, ct, tt, oo, st, atual <-- consultarFatura(ff) =
             ok := FALSE
         END
     END;
+    
+ok, vf <-- consultarValorFatura(ct) =
+    VAR 
+        cartaoAtivo, tipoCartao
+    IN
+        cartaoAtivo := i_cartoes(ct);
+        tipoCartao := i_tipoCartao(ct);
+        
+        IF 
+            cartaoAtivo = TRUE & tipoCartao = credito
+        THEN
+            VAR 
+                faturaAtual 
+            IN
+                faturaAtual := i_faturaAtual(ct);
+                vf := i_totalFatura(faturaAtual);
+                ok := TRUE
+            END
+        ELSE
+            vf := 0;
+            ok := FALSE
+        END
+    END;
 
 ok <-- pre_compraParcelada(co, cd, valor, parcelas) = skip;
-
-ok <-- pre_pix(co, cd, valor) = skip;
 
 ok <-- pre_atualizarLimiteMax(ct, valor) = skip;
 

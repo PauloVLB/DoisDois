@@ -356,24 +356,30 @@ compraParcelada(co, cd, valor, parcelas) =
     END;
 
 // dps add proibição de dummy
-pix(co, cd, valor) =
+ok <-- pix(co, cd, valor) =
     PRE
-        co : CONTA & cd : CONTA &
-        co : contas & cd : contas & valor : 1..saldoCorrente(co) & saldoCorrente(cd) + valor : NAT &
-        co /= cd &
-        valor : 1..limitePix
+        co : CONTA & cd : CONTA & valor : NAT
     THEN
-        saldoCorrente := saldoCorrente <+ {co |-> saldoCorrente(co) - valor, cd |-> saldoCorrente(cd) + valor} ||
-        ANY
-            tt
-        WHERE
-            tt : TRANSACAO & tt /: transacoes
+        IF
+            co : contas & cd : contas & valor : 1..saldoCorrente(co) &
+            saldoCorrente(cd) + valor : NAT & co /= cd & valor : 1..limitePix &
+            co /= contaDummy & cd /= contaDummy & TRANSACAO - transacoes /= {}
         THEN
-            transacoes := transacoes \/ {tt} ||
-            origemTransacoes(tt) := co ||
-            destinoTransacoes(tt) := cd ||
-            valorTransacoes(tt) := valor ||
-            tipoTransacoes(tt) := tranPix
+            saldoCorrente := saldoCorrente <+ {co |-> saldoCorrente(co) - valor, cd |-> saldoCorrente(cd) + valor} ||
+            ANY
+                tt
+            WHERE
+                tt : TRANSACAO & tt /: transacoes
+            THEN
+                transacoes := transacoes \/ {tt} ||
+                origemTransacoes(tt) := co ||
+                destinoTransacoes(tt) := cd ||
+                valorTransacoes(tt) := valor ||
+                tipoTransacoes(tt) := tranPix ||
+                ok := TRUE
+            END
+        ELSE
+            ok := FALSE
         END
     END;
     
@@ -665,6 +671,21 @@ ok, ct, tt, oo, st, atual <-- consultarFatura(ff) =
             st := aberta || atual := FALSE || ok := FALSE
         END
     END;
+    
+ok, vf <-- consultarValorFatura(ct) =
+    PRE
+        ct : CARTAO 
+    THEN
+        IF 
+            ct : creditos
+        THEN
+            vf := totalFatura(faturaAtual(ct)) ||
+            ok := TRUE
+        ELSE
+            vf := 0 ||
+            ok := FALSE
+        END
+    END;
 
 /* --- operações para confirmar pré-condição ---*/
 
@@ -685,24 +706,6 @@ ok <-- pre_compraParcelada(co, cd, valor, parcelas) =
             (valor / parcelas) <= limite(co) &
             saldoCorrente(cd) + valor : NAT &
             !ff.(ff : faturasExistentes(co, parcelas) => (totalFatura(ff) + valor/parcelas) : NAT)
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-
-    END;
-
-ok <-- pre_pix(co, cd, valor) =
-    PRE
-        co : CONTA & cd : CONTA & valor : NAT
-    THEN
-        IF 
-            co : contas &
-            cd : contas &
-            valor : 1..saldoCorrente(co) &
-            saldoCorrente(cd) + valor : NAT &
-            co /= cd
         THEN
             ok := TRUE    
         ELSE
