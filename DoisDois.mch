@@ -288,15 +288,20 @@ ok <-- removerCartao(ct) =
            END
      END;
      
-pagarFatura(cc, ff) = 
+ok <-- pagarFatura(cc, ff) = 
     PRE 
-        cc : CONTA & cc : contas & 
-        ff : FATURA & ff : faturas & statusFatura(ff) /= paga & 
-        totalFatura(ff) > 0 & saldoCorrente(cc) >= totalFatura(ff) &
-        titular(faturaCartao(ff)) = cc
+        cc : CONTA & ff : FATURA 
     THEN
-        saldoCorrente(cc) := saldoCorrente(cc) - totalFatura(ff) ||
-        statusFatura(ff) := paga 
+        IF 
+            cc : contas & ff : faturas & statusFatura(ff) /= paga & 
+            totalFatura(ff) > 0 & saldoCorrente(cc) >= totalFatura(ff) &
+            titular(faturaCartao(ff)) = cc
+        THEN
+            saldoCorrente(cc) := saldoCorrente(cc) - totalFatura(ff) ||
+            statusFatura(ff) := paga || ok := TRUE
+        ELSE
+            ok := FALSE
+        END
     END;
     
 compraParcelada(co, cd, valor, parcelas) =
@@ -390,18 +395,30 @@ compraDebito(co, cd, valor) =
    END;
    
   
-bloquearCartao(ct) =
+ok <-- bloquearCartao(ct) =
     PRE 
-        ct : CARTAO & ct : cartoes & ct /: bloqueados
+        ct : CARTAO 
     THEN 
-        bloqueados := bloqueados \/ {ct}
+        IF 
+            ct : cartoes & ct /: bloqueados
+        THEN
+            bloqueados := bloqueados \/ {ct} || ok := TRUE
+        ELSE
+            ok := FALSE
+        END
     END;
 
-desbloquearCartao(ct) = 
+ok <-- desbloquearCartao(ct) = 
     PRE 
-        ct : CARTAO & ct : cartoes & ct : bloqueados
+        ct : CARTAO
     THEN
-       bloqueados := bloqueados - {ct}
+        IF 
+            ct : cartoes & ct : bloqueados
+        THEN
+           bloqueados := bloqueados - {ct} || ok := TRUE
+        ELSE
+            ok := FALSE
+        END
     END;
     
 atualizarLimiteMax(ct, valor) =
@@ -674,36 +691,6 @@ ok <-- pre_compraDebito(co, cd, valor) =
 
     END;
 
-
-ok <-- pre_bloquearCartao(ct) =
-    PRE
-        ct : CARTAO
-    THEN
-        IF 
-            ct : cartoes &
-            ct /: bloqueados
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-
-    END;
-
-ok <-- pre_desbloquearCartao(ct) =
-    PRE
-        ct : CARTAO
-    THEN
-        IF 
-            ct : cartoes &
-            ct : bloqueados
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-
-    END;
 
 ok <-- pre_atualizarLimiteMax(ct, valor) =
     PRE

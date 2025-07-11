@@ -171,8 +171,8 @@ ok <-- sacarCorrente(cc, valor) =
         saldoCorrente := i_saldoCorrente(cc);
         
         IF 
-            cc <= maxConta & statusConta = ativa & valor >= saqueMinCorrente &
-            valor <= saldoCorrente & tamTransacao <= maxTransacao &
+            statusConta = ativa & valor >= saqueMinCorrente &
+            valor <= saldoCorrente & tamTransacao < maxTransacao &
             valor >= 1
         THEN
              i_saldoCorrente(cc) := i_saldoCorrente(cc) -  valor;
@@ -224,8 +224,8 @@ ok <-- sacarPoupanca(cc, valor) =
         total := saldoCorrente + valor;
         
         IF 
-            cc <= maxConta & statusConta = ativa & valor >= saqueMinPoupanca &
-            valor <= saldoPoupanca & tamTransacao <= maxTransacao &
+            statusConta = ativa & valor >= saqueMinPoupanca &
+            valor <= saldoPoupanca & tamTransacao < maxTransacao &
             valor >= 1 & total <= MAXINT
         THEN
             i_saldoPoupanca(cc) := i_saldoPoupanca(cc) -  valor;
@@ -275,7 +275,7 @@ ok <-- adicionarCartao(ct, tp, cc) =
         temFatura := bool(tp = debito or tamFatura <= maxFatura);
         
         IF 
-            ct <= maxCartao & statusCartao = FALSE or statusConta = ativa or temFatura = TRUE
+            statusCartao = FALSE or statusConta = ativa or temFatura = TRUE
         THEN
             cartaoDuplicado := FALSE;
             VAR ii IN
@@ -452,7 +452,32 @@ ok <-- removerCartao(ct) =
         END;
 
 
-pagarFatura(cc, ff) = skip;
+ok <-- pagarFatura(cc, ff) = 
+    VAR 
+        contaFatura, faturaAtiva, statusFatura, 
+        totalFatura, saldo, cartao, titular
+    IN 
+        contaFatura := i_contas(cc);
+        faturaAtiva := i_faturas(ff);
+        statusFatura := i_statusFatura(ff);
+        totalFatura := i_totalFatura(ff);
+        saldo := i_saldoCorrente(cc);
+        cartao := i_faturaCartao(ff);
+        titular := i_titular(cartao);
+        
+        IF 
+            contaFatura = ativa & faturaAtiva = TRUE &
+            statusFatura /= paga & totalFatura > 0 &
+            saldo >= totalFatura & titular = cc
+        THEN
+            i_saldoCorrente(cc) := i_saldoCorrente(cc) - totalFatura;
+            i_statusFatura(ff) := paga;
+            ok := TRUE
+        ELSE
+            ok := FALSE
+        END
+        
+    END;
 
 compraParcelada(co, cd, valor, parcelas) = skip;
 
@@ -460,9 +485,41 @@ pix(co, cd, valor) = skip;
 
 compraDebito(co, cd, valor) = skip;
 
-bloquearCartao(ct) = skip;
+ok <-- bloquearCartao(ct) = 
+    VAR 
+        cartaoAtivo, cartaoBloqueado
+    IN
+        cartaoAtivo := i_cartoes(ct);
+        cartaoBloqueado := i_bloqueados(ct);
+        
+        IF 
+            cartaoAtivo = TRUE & cartaoBloqueado = FALSE
+        THEN
+            i_bloqueados(ct) := TRUE;
+            ok := TRUE
+        ELSE
+            ok := FALSE
+        END
+        
+    END;
 
-desbloquearCartao(ct) = skip;
+ok <-- desbloquearCartao(ct) = 
+    VAR 
+        cartaoAtivo, cartaoBloqueado
+    IN
+        cartaoAtivo := i_cartoes(ct);
+        cartaoBloqueado := i_bloqueados(ct);
+        
+        IF 
+            cartaoAtivo = TRUE & cartaoBloqueado = TRUE
+        THEN
+            i_bloqueados(ct) := FALSE;
+            ok := TRUE
+        ELSE
+            ok := FALSE
+        END
+        
+    END;
 
 atualizarLimiteMax(ct, valor) = skip;
 
@@ -583,10 +640,6 @@ ok <-- pre_compraParcelada(co, cd, valor, parcelas) = skip;
 ok <-- pre_pix(co, cd, valor) = skip;
 
 ok <-- pre_compraDebito(co, cd, valor) = skip;
-
-ok <-- pre_bloquearCartao(ct) = skip;
-
-ok <-- pre_desbloquearCartao(ct) = skip;
 
 ok <-- pre_atualizarLimiteMax(ct, valor) = skip;
 
