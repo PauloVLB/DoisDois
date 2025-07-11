@@ -554,8 +554,8 @@ hh, ok <-- historico(cc) =
                     i_tipoTransacoes : TRANSACAO --> TIPOTRANSACAO &
                     hh : 0..maxTransacao --> BOOL &
                     dom(hh |> {TRUE}) = dom((0..(ii-1) <| i_transacoes) |> {TRUE}) /\ 
-                    ((i_origem~[{cc}] - tipoTransacoes~[{tranDepositoCartao}]) \/
-                    (i_destino~[{cc}] -  i_tipoTransacoes~[{tranCredito}]))
+                    ((i_origem~[{cc}] - i_tipoTransacoes~[{tranDepositoCartao}]) \/
+                    (i_destino~[{cc}] - i_tipoTransacoes~[{tranCredito}]))
                     
                 VARIANT
                     maxTransacao - ii + 1
