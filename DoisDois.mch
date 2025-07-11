@@ -686,6 +686,53 @@ ok, vf <-- consultarValorFatura(ct) =
             ok := FALSE
         END
     END;
+    
+ok, cts <-- consultarCartoesConta(cc) = 
+    PRE 
+        cc : CONTA
+    THEN
+        IF 
+            cc : contas & cc /= contaDummy
+        THEN
+            ANY ctsList
+            WHERE
+                  ctsList : CARTAO --> BOOL &
+                  dom(ctsList |> {TRUE}) = dom(titular |> {cc})
+            THEN
+                  cts := ctsList
+            END ||
+            ok := TRUE
+        ELSE
+            cts := CARTAO*{FALSE} ||
+            ok := FALSE
+        END
+    END;
+    
+ok, tipo, ll, llMax, block <-- consultarCartao(ct) =
+    PRE
+        ct : CARTAO
+    THEN
+        IF
+            ct : cartoes & ct /= cartaoDummy
+        THEN
+            IF 
+                tipoCartao(ct) = credito
+            THEN
+                ll := limite(ct) ||
+                llMax := limiteMax(ct) 
+            ELSE
+                ll := 0 || llMax := 0 
+            END ||
+            tipo := tipoCartao(ct) ||
+            block := bool(ct : bloqueados) ||
+            ok := TRUE 
+        ELSE
+            ll := 0 || llMax := 0 || tipo := debito ||
+            block := FALSE || ok := FALSE
+        END
+    END;
+
+
 
 /* --- operações para confirmar pré-condição ---*/
 
@@ -760,48 +807,6 @@ ok <-- pre_consultarValorFatura(ct) =
         END
 
     END;
-
-ok <-- pre_consultarCartoesConta(cc) =
-    PRE
-        cc : CONTA
-    THEN
-        IF 
-            cc : contas
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-
-    END;
-ok <-- pre_consultarLimiteDisponivel(ct) =
-    PRE
-        ct : CARTAO
-    THEN
-        IF 
-            ct : creditos
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-
-    END;
-
-ok <-- pre_consultarLimiteMax(ct) =
-    PRE
-        ct : CARTAO
-    THEN
-        IF 
-            ct : creditos
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-
-    END;
-
 
 ok <-- pre_removerConta(cc) =
     PRE

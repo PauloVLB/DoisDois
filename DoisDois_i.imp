@@ -393,7 +393,7 @@ ok <-- removerCartao(ct) =
                     i_faturaCartao : FATURA --> CARTAO &
                     i_statusFatura : FATURA --> STATUSFATURA &
                     i_totalFatura : FATURA --> NAT &
-                    pagas = TRUE <=> (dom(((0..(ii-1)) <| i_faturas |> {TRUE})) /\ dom(i_faturaCartao |> {ct}) <: dom(i_statusFatura |> {paga}) \/ dom(i_totalFatura |> {0}))
+                    pagas = TRUE <=> (((0..ii-1) /\ dom(i_faturas |> {TRUE}) /\ dom(i_faturaCartao |> {ct})) <: dom(i_statusFatura |> {paga}) \/ dom(i_totalFatura |> {0}))
                 VARIANT 
                     maxFatura - ii + 1
                     
@@ -422,7 +422,7 @@ ok <-- removerCartao(ct) =
                         ii : 0..(maxFatura + 1) &
                         i_faturas : FATURA --> BOOL &
                         i_faturaCartao: FATURA --> CARTAO &
-                        dom((0 .. (ii - 1) <| i_faturaCartao |> {ct})) <: dom(i_faturas |> {FALSE})
+                        ((0..ii-1) /\ dom(i_faturaCartao |> {ct})) <: dom(i_faturas |> {FALSE})
                         // o que espero : faturas := faturas - faturasCartao
                     VARIANT
                         maxFatura + 1 - ii
@@ -650,7 +650,7 @@ ccs <-- consultarContas =
             i_contas : (0..maxConta) --> STATUSCONTA &
             contas = dom(i_contas |> {ativa}) &
             ccs : (0..maxConta) --> BOOL &
-            dom(ccs |> {TRUE}) = dom((0..(ii-1) <| i_contas) |> {ativa})
+            dom(ccs |> {TRUE}) = ((0..ii-1) /\ dom(i_contas |> {ativa}))
         VARIANT
             maxConta - ii + 1
         END
@@ -713,9 +713,9 @@ hh, ok <-- historico(cc) =
                     i_destino : TRANSACAO --> CONTA &
                     i_tipoTransacoes : TRANSACAO --> TIPOTRANSACAO &
                     hh : 0..maxTransacao --> BOOL &
-                    dom(hh |> {TRUE}) = dom((0..(ii-1) <| i_transacoes) |> {TRUE}) /\ 
+                    dom(hh |> {TRUE}) = ((0..ii-1) /\ dom(i_transacoes |> {TRUE}) /\ 
                     ((i_origem~[{cc}] - i_tipoTransacoes~[{tranDepositoCartao}]) \/
-                    (i_destino~[{cc}] - i_tipoTransacoes~[{tranCredito}]))
+                    (i_destino~[{cc}] - i_tipoTransacoes~[{tranCredito}])))
                     
                 VARIANT
                     maxTransacao - ii + 1
@@ -786,7 +786,7 @@ ok, ftCartao <-- consultarFaturasCartao(ct) =
                 i_faturas : (0..maxFatura) --> BOOL &
                 faturas = dom(i_faturas |> {TRUE}) &
                 ftCartao : (0..maxFatura) --> BOOL &
-                dom(ftCartao |> {TRUE}) = ((0..(ii-1) /\ dom(i_faturas |> {TRUE})) /\ dom(i_faturaCartao |> {ct}))
+                dom(ftCartao |> {TRUE}) = ((0..ii-1) /\ dom(i_faturas |> {TRUE}) /\ dom(i_faturaCartao |> {ct}))
             VARIANT
                 maxFatura - ii + 1
             END
@@ -847,6 +847,80 @@ ok, vf <-- consultarValorFatura(ct) =
             ok := FALSE
         END
     END;
+    
+    
+ok, cts <-- consultarCartoesConta(cc) = 
+    VAR
+        contaAtiva
+    IN
+        contaAtiva := i_contas(cc);
+        cts := (0..maxCartao)*{FALSE};
+        
+        IF
+            contaAtiva = ativa & cc /= contaDummy
+        THEN
+            VAR ii IN 
+                ii := 0;
+                WHILE ii <= maxCartao DO
+                    VAR 
+                        atual, titularCartao 
+                    IN 
+                        atual := i_cartoes(ii);
+                        titularCartao := i_titular(ii);
+                        IF 
+                            atual = TRUE & titularCartao = cc
+                        THEN
+                            cts(ii) := TRUE
+                        END;
+                    ii := ii + 1
+                    END
+            INVARIANT
+                ii : 0..(maxCartao+1) &
+                i_cartoes : CARTAO --> BOOL &
+                cartoes = dom(i_cartoes |> {TRUE}) &
+                i_titular : CARTAO --> CONTA &
+                titular = cartoes <| i_titular &
+                cts : (0..maxCartao) --> BOOL &
+                dom(cts |> {TRUE}) = ((0..ii-1) /\ dom((dom(i_cartoes |> {TRUE})) <| i_titular |> {cc}))
+            VARIANT
+                maxCartao - ii + 1
+            END
+         END;
+         ok := TRUE
+        ELSE
+            ok := FALSE
+        END
+    END;
+    
+ok, tipo, ll, llMax, block <-- consultarCartao(ct) =
+    VAR 
+        cartaoAtivo, tipoCartao
+    IN
+        cartaoAtivo := i_cartoes(ct);
+        tipoCartao := i_tipoCartao(ct);
+        
+        IF 
+            cartaoAtivo = TRUE & ct /= cartaoDummy
+        THEN
+            IF 
+                tipoCartao = credito
+            THEN
+                ll := i_limite(ct);
+                llMax := i_limiteMax(ct)
+            ELSE
+                ll := 0;
+                llMax := 0
+            END;
+            tipo := tipoCartao;
+            block := i_bloqueados(ct);
+            ok := TRUE
+        ELSE
+            ll := 0; 
+            llMax := 0;
+            block := FALSE; 
+            ok := FALSE
+        END
+    END;
 
 ok <-- pre_compraParcelada(co, cd, valor, parcelas) = skip;
 
@@ -855,12 +929,6 @@ ok <-- pre_atualizarLimiteMax(ct, valor) = skip;
 ok <-- pre_atualizarLimite(ct, valor) = skip;
 
 ok <-- pre_consultarValorFatura(ct) = skip;
-
-ok <-- pre_consultarCartoesConta(cc) = skip;
-
-ok <-- pre_consultarLimiteDisponivel(ct) = skip;
-
-ok <-- pre_consultarLimiteMax(ct) = skip;
 
 ok <-- pre_removerConta(cc) = skip;
 
