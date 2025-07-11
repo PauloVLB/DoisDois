@@ -373,25 +373,31 @@ pix(co, cd, valor) =
         END
     END;
     
-compraDebito(co, cd, valor) =
+ok <-- compraDebito(co, cd, valor) =
     PRE
-        co : CARTAO & cd : CONTA &
-        co : debitos & co /: bloqueados &
-        cd : contas & valor : 1..saldoCorrente(titular(co)) & saldoCorrente(cd) + valor : NAT &
-        titular(co) /= cd & TRANSACAO - transacoes /= {}
+        co : CARTAO & cd : CONTA & valor : NAT
     THEN
-       saldoCorrente := saldoCorrente <+ {titular(co) |-> saldoCorrente(titular(co)) - valor, cd |-> saldoCorrente(cd) + valor} ||
-        ANY
-            tt
-        WHERE
-            tt : TRANSACAO & tt /: transacoes
+        IF 
+            co : debitos & co /: bloqueados &
+            cd : contas & valor : 1..saldoCorrente(titular(co)) & saldoCorrente(cd) + valor : NAT &
+            titular(co) /= cd & TRANSACAO - transacoes /= {}
         THEN
-            transacoes := transacoes \/ {tt} ||
-            origemTransacoes(tt) := titular(co) ||
-            destinoTransacoes(tt) := cd ||
-            valorTransacoes(tt) := valor ||
-            tipoTransacoes(tt) := tranDebito
-        END
+           saldoCorrente := saldoCorrente <+ {titular(co) |-> saldoCorrente(titular(co)) - valor, cd |-> saldoCorrente(cd) + valor} ||
+            ANY
+                tt
+            WHERE
+                tt : TRANSACAO & tt /: transacoes
+            THEN
+                transacoes := transacoes \/ {tt} ||
+                origemTransacoes(tt) := titular(co) ||
+                destinoTransacoes(tt) := cd ||
+                valorTransacoes(tt) := valor ||
+                tipoTransacoes(tt) := tranDebito
+            END ||
+            ok := TRUE
+       ELSE
+           ok := FALSE
+       END
    END;
    
   
@@ -577,6 +583,30 @@ sc, sp, ok <-- consultarSaldos(cc) =
         END
     END;
     
+ok, oo, dd, vv, tp <-- consultarTransacao(tt) = 
+    PRE
+        tt : TRANSACAO & tt : transacoes
+    THEN
+        IF 
+            tt : transacoes
+        THEN
+            vv := valorTransacoes(tt) || 
+            tp := tipoTransacoes(tt) ||
+            ANY ot, dt
+            WHERE 
+                ot : CONTA & dt : CONTA &
+                ot = origemTransacoes(tt) & dt = destinoTransacoes(tt)
+            THEN
+                oo := ot || dd := dt
+            END ||
+            ok := TRUE
+         ELSE
+             oo := contaDummy || dd := contaDummy || 
+             vv := 0 || tp := saqueCorrente ||
+             ok := FALSE
+         END      
+    END;
+    
 /* --- operações para confirmar pré-condição ---*/
 
 
@@ -612,25 +642,6 @@ ok <-- pre_depositarPoupanca(cc, valor) =
     END;
 
 
-ok <-- pre_pagarFatura(cc, ff) =
-    PRE
-        cc : CONTA & ff : FATURA
-    THEN
-        IF 
-            cc : contas &
-            ff : faturas &
-            statusFatura(ff) /= paga &
-            totalFatura(ff) > 0 &
-            saldoCorrente(cc) >= totalFatura(ff) &
-            titular(faturaCartao(ff)) = cc
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-
-    END;
-
 ok <-- pre_compraParcelada(co, cd, valor, parcelas) =
     PRE
         co : CARTAO & cd : CONTA & valor : NAT & parcelas : NAT
@@ -664,25 +675,6 @@ ok <-- pre_pix(co, cd, valor) =
             valor : 1..saldoCorrente(co) &
             saldoCorrente(cd) + valor : NAT &
             co /= cd
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-
-    END;
-
-ok <-- pre_compraDebito(co, cd, valor) =
-    PRE
-        co : CARTAO & cd : CONTA & valor : NAT
-    THEN
-        IF 
-            co : debitos &
-            co /: bloqueados &
-            cd : contas &
-            valor : 1..saldoCorrente(titular(co)) &
-            saldoCorrente(cd) + valor : NAT &
-            titular(co) /= cd
         THEN
             ok := TRUE    
         ELSE
@@ -779,19 +771,6 @@ ok <-- pre_consultarLimiteMax(ct) =
 
     END;
 
-ok <-- pre_consultarTransacao(tt) =
-    PRE
-        tt : TRANSACAO
-    THEN
-        IF 
-            tt : transacoes
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-
-    END;
 
 ok <-- pre_removerConta(cc) =
     PRE
