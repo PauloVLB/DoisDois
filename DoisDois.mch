@@ -227,7 +227,7 @@ ok <-- adicionarCartao(ct, tp, cc) =
     THEN
         IF 
            ct /: cartoes & cc : contas & tipoCartao~[{tp}] /\ titular~[{cc}] = {} & 
-        (tp = credito => (FATURA - faturas /= {}))
+        (tp = credito => (FATURA - faturas /= {})) 
         
         THEN
             cartoes := cartoes \/ {ct} ||
@@ -541,6 +541,7 @@ hh, ok <-- historico(cc) =
           END ||
           ok := TRUE
        ELSE
+           hh := TRANSACAO*{FALSE} ||
            ok := FALSE
        END
    END;
@@ -554,6 +555,7 @@ sc, sp, ok <-- consultarSaldos(cc) =
         THEN
             sc := saldoCorrente(cc) || sp := saldoPoupanca(cc) || ok := TRUE
         ELSE 
+            sc := 0 || sp := 0 ||
             ok := FALSE
         END
     END;
