@@ -28,7 +28,6 @@ VALUES
     contaDummy = 0;
     cartaoDummy = 0;
     faturaDummy = 0;
-    transacaoDummy = 0;
     ativa = 1;
     removida = 2;
     livre = 0;
@@ -266,7 +265,7 @@ ok <-- adicionarCartao(ct, tp, cc) =
         // verificar se conta é ativa e se cartão já foi adicionado
         statusConta := i_contas(cc) ;
         statusCartao := i_cartoes(ct);
-        temFatura := bool(tp = debito or tamFatura <= maxFatura);
+        temFatura := bool(tp = debito or tamFatura < maxFatura);
         
         IF 
             statusCartao = FALSE & statusConta = ativa & temFatura = TRUE &
@@ -629,7 +628,7 @@ atualizarLimite(ct, valor) = skip;
 
 removerConta(cc) = skip;
 
-passarMes = skip;
+ok <-- passarMes = skip;
 
 
 ccs <-- consultarContas = 
@@ -934,8 +933,6 @@ ok <-- pre_removerConta(cc) = skip;
 
 ok <-- pre_consultarFaturasCartao(ct) = skip;
 
-ok <-- pre_consultarFatura(ff) = skip;
-
-ok <-- pre_passarMes = skip
+ok <-- pre_consultarFatura(ff) = skip
     
 END

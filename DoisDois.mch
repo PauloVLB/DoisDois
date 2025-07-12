@@ -10,7 +10,7 @@ SETS
 CONSTANTS         
     taxaRendimento, jurosFatura, maxParcelas, limiteMaxPadrao, 
     saqueMinCorrente, saqueMinPoupanca, limitePix,
-    contaDummy, cartaoDummy, faturaDummy, transacaoDummy, 
+    contaDummy, cartaoDummy, faturaDummy, 
     maxConta, maxCartao, maxFatura, maxTransacao
     
 
@@ -23,7 +23,7 @@ PROPERTIES
     limiteMaxPadrao : NAT & maxParcelas : NAT1 &
     saqueMinCorrente : NAT1& saqueMinPoupanca : NAT1 &
     limitePix : NAT1 & contaDummy : CONTA & cartaoDummy : CARTAO &
-    faturaDummy : FATURA & transacaoDummy : TRANSACAO
+    faturaDummy : FATURA 
 
 VARIABLES
     contas, cartoes, faturas, transacoes, saldoCorrente, saldoPoupanca, 
@@ -500,56 +500,69 @@ removerConta(cc) =
     END;
 
 
-passarMes =
-    PRE
+ok <-- passarMes =
+    IF
         !cc.(cc : contas => saldoPoupanca(cc) * taxaRendimento : NAT) &
         !ff.((ff : faturas & faturaOrdem(ff) <= faturaOrdem(faturaAtual(faturaCartao(ff))) & (statusFatura(ff) : {vencida, aberta})) 
             => totalFatura(ff) * jurosFatura : NAT)
     THEN
         saldoPoupanca := %cc.(cc : contas | saldoPoupanca(cc) * taxaRendimento) ||
         
-        ANY
-            cartoesComProximaFatura, cartoesSemProximaFatura, 
-            proximaFaturaExistente,
-            novasFaturas, faturaCartaoNovo, faturaOrdemNovo, ordensCartoesSemProxima
-        WHERE
-            cartoesSemProximaFatura = {ct | ct : creditos & faturaOrdem(faturaAtual(ct)) = card(faturaCartao |> {ct}) - 1} &
-            cartoesComProximaFatura = creditos - cartoesSemProximaFatura &
-            cartoesSemProximaFatura : FIN(cartoesSemProximaFatura) &
-            cartoesComProximaFatura : FIN(cartoesComProximaFatura) &
-            
-            novasFaturas <: FATURA - faturas & 
-            novasFaturas : FIN(novasFaturas) &
-            card(novasFaturas) = card(cartoesSemProximaFatura) &
-            
-            faturaCartaoNovo : novasFaturas >->> cartoesSemProximaFatura &
-            
-            ordensCartoesSemProxima = %ct.(ct : cartoesSemProximaFatura | faturaOrdem(faturaAtual(ct))) &
-            faturaOrdemNovo = %ff.(ff : novasFaturas | ordensCartoesSemProxima (faturaCartaoNovo(ff)) + 1) &
-            //faturaOrdemNovo = %ff.(ff : novasFaturas | faturaOrdem(faturaAtual(faturaCartaoNovo(ff))) + 1) &
-            //faturaOrdemNovo = %ff.(ff : novasFaturas | 12) &
-            
-            proximaFaturaExistente = {ct, ff | ct : cartoesComProximaFatura & 
-                                               ff : faturas & 
-                                               faturaOrdem(ff) = faturaOrdem(faturaAtual(ct)) + 1 &
-                                               faturaCartao(ff) = ct }
-        THEN
-            faturas := faturas \/ novasFaturas ||
-            faturaCartao := faturaCartao \/ faturaCartaoNovo ||
-            faturaOrdem := faturaOrdem \/ faturaOrdemNovo ||
-            faturaAtual := faturaAtual <+ 
-                           (%ct.(ct : cartoesComProximaFatura | proximaFaturaExistente(ct)) \/
-                            %ct.(ct : cartoesSemProximaFatura | faturaCartaoNovo~(ct))) ||
-            statusFatura := statusFatura <+ 
-                        %ff.(ff : ran(faturaAtual) & statusFatura(ff) = aberta & totalFatura(ff) > 0 | vencida) <+
-                        %ff.(ff : ran(faturaAtual) & statusFatura(ff) = aberta & totalFatura(ff) = 0 | paga) \/
-                        novasFaturas * {aberta} ||
-            totalFatura := totalFatura <+ 
-                       %ff.(ff : faturas & faturaOrdem(ff) <= faturaOrdem(faturaAtual(faturaCartao(ff))) 
-                             & statusFatura(ff) : {vencida, aberta}
-                           | totalFatura(ff) * jurosFatura) \/ 
-                       novasFaturas * {0}
-        END
+        LET
+            cartoesSemProximaFatura
+        BE
+            cartoesSemProximaFatura = {ct | ct : creditos & faturaOrdem(faturaAtual(ct)) = card(faturaCartao |> {ct}) - 1}
+        IN
+            IF 
+                cartoesSemProximaFatura : FIN(cartoesSemProximaFatura) & card(cartoesSemProximaFatura) <= card(TRANSACAO - transacoes)
+            THEN
+                ANY
+                    cartoesComProximaFatura, proximaFaturaExistente,
+                    novasFaturas, faturaCartaoNovo, faturaOrdemNovo, ordensCartoesSemProxima
+                WHERE
+                    cartoesComProximaFatura = creditos - cartoesSemProximaFatura &
+                    cartoesSemProximaFatura : FIN(cartoesSemProximaFatura) &
+                    cartoesComProximaFatura : FIN(cartoesComProximaFatura) &
+                    
+                    novasFaturas <: FATURA - faturas & 
+                    novasFaturas : FIN(novasFaturas) &
+                    card(novasFaturas) = card(cartoesSemProximaFatura) &
+                    
+                    faturaCartaoNovo : novasFaturas >->> cartoesSemProximaFatura &
+                    
+                    ordensCartoesSemProxima = %ct.(ct : cartoesSemProximaFatura | faturaOrdem(faturaAtual(ct))) &
+                    faturaOrdemNovo = %ff.(ff : novasFaturas | ordensCartoesSemProxima (faturaCartaoNovo(ff)) + 1) &
+                    //faturaOrdemNovo = %ff.(ff : novasFaturas | faturaOrdem(faturaAtual(faturaCartaoNovo(ff))) + 1) &
+                    //faturaOrdemNovo = %ff.(ff : novasFaturas | 12) &
+                    
+                    proximaFaturaExistente = {ct, ff | ct : cartoesComProximaFatura & 
+                                                       ff : faturas & 
+                                                       faturaOrdem(ff) = faturaOrdem(faturaAtual(ct)) + 1 &
+                                                       faturaCartao(ff) = ct }
+                THEN
+                    faturas := faturas \/ novasFaturas ||
+                    faturaCartao := faturaCartao \/ faturaCartaoNovo ||
+                    faturaOrdem := faturaOrdem \/ faturaOrdemNovo ||
+                    faturaAtual := faturaAtual <+ 
+                                   (%ct.(ct : cartoesComProximaFatura | proximaFaturaExistente(ct)) \/
+                                    %ct.(ct : cartoesSemProximaFatura | faturaCartaoNovo~(ct))) ||
+                    statusFatura := statusFatura <+ 
+                                %ff.(ff : ran(faturaAtual) & statusFatura(ff) = aberta & totalFatura(ff) > 0 | vencida) <+
+                                %ff.(ff : ran(faturaAtual) & statusFatura(ff) = aberta & totalFatura(ff) = 0 | paga) \/
+                                novasFaturas * {aberta} ||
+                    totalFatura := totalFatura <+ 
+                               %ff.(ff : faturas & faturaOrdem(ff) <= faturaOrdem(faturaAtual(faturaCartao(ff))) 
+                                     & statusFatura(ff) : {vencida, aberta}
+                                   | totalFatura(ff) * jurosFatura) \/ 
+                               novasFaturas * {0}
+                END ||
+                ok := TRUE
+             ELSE
+                ok := FALSE
+             END
+         END
+    ELSE
+        ok := FALSE
     END;
     
     
@@ -853,18 +866,6 @@ ok <-- pre_consultarFatura(ff) =
             ok := FALSE
         END
 
-    END;
-
-ok <-- pre_passarMes =
-        IF 
-            !cc.(cc : contas => saldoPoupanca(cc) * taxaRendimento : NAT) &
-            !ff.((ff : faturas & faturaOrdem(ff) <= faturaOrdem(faturaAtual(faturaCartao(ff))) &
-                  (statusFatura(ff) : {vencida, aberta})) => 
-                  totalFatura(ff) * jurosFatura : NAT)
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
+    END
 
 END
