@@ -523,7 +523,7 @@ removerConta(cc) =
 
 ok <-- passarMes =
     IF
-        !cc.(cc : contas => saldoPoupanca(cc) * taxaRendimento : NAT) &
+        ran(saldoPoupanca) <: 0..(MAXINT/taxaRendimento) &
         !ff.((ff : faturas & faturaOrdem(ff) <= faturaOrdem(faturaAtual(faturaCartao(ff))) & (statusFatura(ff) : {vencida, aberta})) 
             => totalFatura(ff) * jurosFatura : NAT)
     THEN
