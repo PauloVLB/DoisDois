@@ -105,6 +105,7 @@ INVARIANT
     /*auxiliares*/
     tamFatura : NAT & tamFatura = card(faturas) &
     tamTransacao : NAT & tamTransacao = card(transacoes) &
+    0..tamTransacao-1 = transacoes &
     tamCredito : NAT & tamCredito = card(creditos)
     
 DEFINITIONS     
@@ -167,35 +168,15 @@ ok <-- depositarCorrente(cc, valor) =
         maxSaldo := MAXINT - valor;
         IF 
             statusConta = ativa & saldoCorrente <= maxSaldo & cc /= contaDummy &
-            tamTransacao < maxTransacao
+            tamTransacao <= maxTransacao
         THEN
             i_saldoCorrente(cc) := i_saldoCorrente(cc) + valor;
-            VAR ii, atual IN
-                ii := 0;
-                atual := i_transacoes(ii);
-                
-                WHILE ii < maxTransacao & atual = TRUE DO
-                    ii := ii + 1;
-                    atual := i_transacoes(ii)
-
-                INVARIANT 
-                    ii : 0..maxTransacao &   
-                    ii : TRANSACAO &
-                    i_transacoes : TRANSACAO --> BOOL &
-                    transacoes = dom(i_transacoes |> {TRUE}) &
-                    (0..ii-1) <: dom(i_transacoes |> {TRUE}) &
-                    (atual = FALSE => (ii : TRANSACAO & ii /: transacoes))
-                VARIANT 
-                    maxTransacao - ii
-                END;
-                
-                i_transacoes(ii) := TRUE;
-                i_origem(ii) := cc;
-                i_destino(ii) := cc;
-                i_valorTransacoes(ii) := valor;
-                i_tipoTransacoes(ii) := depositoCorrente;
-                tamTransacao := tamTransacao + 1
-           END;
+            i_transacoes(tamTransacao) := TRUE;
+            i_origem(tamTransacao) := cc;
+            i_destino(tamTransacao) := cc;
+            i_valorTransacoes(tamTransacao) := valor;
+            i_tipoTransacoes(tamTransacao) := depositoCorrente;
+            tamTransacao := tamTransacao + 1;
             ok := TRUE
         ELSE
             ok := FALSE
@@ -211,35 +192,15 @@ ok <-- depositarPoupanca(cc, valor) =
         maxSaldo := MAXINT - valor;
         IF 
             statusConta = ativa & saldoPoupanca <= maxSaldo & cc /= contaDummy &
-            tamTransacao < maxTransacao
+            tamTransacao <= maxTransacao
         THEN
             i_saldoPoupanca(cc) := i_saldoPoupanca(cc) + valor;
-            VAR ii, atual IN
-                ii := 0;
-                atual := i_transacoes(ii);
-                
-                WHILE ii < maxTransacao & atual = TRUE DO
-                    ii := ii + 1;
-                    atual := i_transacoes(ii)
-
-                INVARIANT 
-                    ii : 0..maxTransacao &   
-                    ii : TRANSACAO &
-                    i_transacoes : TRANSACAO --> BOOL &
-                    transacoes = dom(i_transacoes |> {TRUE}) &
-                    (0..ii-1) <: dom(i_transacoes |> {TRUE}) &
-                    (atual = FALSE => (ii : TRANSACAO & ii /: transacoes))
-                VARIANT 
-                    maxTransacao - ii
-                END;
-                
-                i_transacoes(ii) := TRUE;
-                i_origem(ii) := cc;
-                i_destino(ii) := cc;
-                i_valorTransacoes(ii) := valor;
-                i_tipoTransacoes(ii) := depositoPoupanca;
-                tamTransacao := tamTransacao + 1
-           END;
+            i_transacoes(tamTransacao) := TRUE;
+            i_origem(tamTransacao) := cc;
+            i_destino(tamTransacao) := cc;
+            i_valorTransacoes(tamTransacao) := valor;
+            i_tipoTransacoes(tamTransacao) := depositoPoupanca;
+            tamTransacao := tamTransacao + 1;
             ok := TRUE
         ELSE
             ok := FALSE
@@ -256,38 +217,17 @@ ok <-- sacarCorrente(cc, valor) =
         
         IF 
             statusConta = ativa & valor >= saqueMinCorrente &
-            valor <= saldoCorrente & tamTransacao < maxTransacao &
+            valor <= saldoCorrente & tamTransacao <= maxTransacao &
             valor >= 1 & cc /= contaDummy
         THEN
              i_saldoCorrente(cc) := i_saldoCorrente(cc) -  valor;
-             VAR ii, atual IN
-                    ii := 0;
-                    atual := i_transacoes(ii);
-                    
-                    WHILE ii < maxTransacao & atual = TRUE DO
-                        ii := ii + 1;
-                        atual := i_transacoes(ii)
-    
-                    INVARIANT 
-                        ii : 0..maxTransacao &   
-                        ii : TRANSACAO &
-                        i_transacoes : TRANSACAO --> BOOL &
-                        transacoes = dom(i_transacoes |> {TRUE}) &
-                        (0..ii-1) <: dom(i_transacoes |> {TRUE}) &
-                        (atual = FALSE => (ii : TRANSACAO & ii /: transacoes))
-                    VARIANT 
-                        maxTransacao - ii
-                    END;
-                    
-                    i_transacoes(ii) := TRUE;
-                    i_origem(ii) := cc;
-                    i_destino(ii) := cc;
-                    i_valorTransacoes(ii) := valor;
-                    i_tipoTransacoes(ii) := saqueCorrente;
-                    tamTransacao := tamTransacao + 1  
-               END;
-               
-               ok := TRUE 
+            i_transacoes(tamTransacao) := TRUE;
+            i_origem(tamTransacao) := cc;
+            i_destino(tamTransacao) := cc;
+            i_valorTransacoes(tamTransacao) := valor;
+            i_tipoTransacoes(tamTransacao) := saqueCorrente;
+            tamTransacao := tamTransacao + 1; 
+            ok := TRUE 
         ELSE
             ok := FALSE
         END
@@ -305,36 +245,18 @@ ok <-- sacarPoupanca(cc, valor) =
         
         IF 
             statusConta = ativa & valor >= saqueMinPoupanca &
-            valor <= saldoPoupanca & tamTransacao < maxTransacao &
+            valor <= saldoPoupanca & tamTransacao <= maxTransacao &
             valor >= 1 & saldoCorrente <= maxSaldo & cc /= contaDummy
         THEN
             i_saldoPoupanca(cc) := i_saldoPoupanca(cc) -  valor;
             i_saldoCorrente(cc) := i_saldoCorrente(cc) + valor;
-             VAR ii, atual IN
-                    ii := 0;
-                    atual := i_transacoes(ii);
-                    
-                    WHILE ii < maxTransacao & atual = TRUE DO
-                        ii := ii + 1;
-                        atual := i_transacoes(ii)
-                    INVARIANT 
-                        ii : 0..maxTransacao &   
-                        i_transacoes : TRANSACAO --> BOOL &
-                        transacoes = dom(i_transacoes |> {TRUE}) &
-                        (0..ii-1) <: dom(i_transacoes |> {TRUE}) &
-                        (atual = FALSE => (ii : TRANSACAO & ii /: transacoes))
-                    VARIANT 
-                        maxTransacao - ii
-                    END;
-     
-                    i_transacoes(ii) := TRUE;
-                    i_origem(ii) := cc;
-                    i_destino(ii) := cc;
-                    i_valorTransacoes(ii) := valor;
-                    i_tipoTransacoes(ii) := saquePoupanca;
-                    tamTransacao := tamTransacao + 1
-               END;
-               ok := TRUE
+            i_transacoes(tamTransacao) := TRUE;
+            i_origem(tamTransacao) := cc;
+            i_destino(tamTransacao) := cc;
+            i_valorTransacoes(tamTransacao) := valor;
+            i_tipoTransacoes(tamTransacao) := saquePoupanca;
+            tamTransacao := tamTransacao + 1;
+            ok := TRUE
         ELSE
             ok := FALSE
         END
@@ -563,51 +485,32 @@ compraParcelada(co, cd, valor, parcelas) = skip;
 
 ok <-- pix(co, cd, valor) = 
     VAR 
-        contaOrigem, contaDestino, saldo, maxSaldo
+        contaOrigem, contaDestino, maxSaldo,
+        saldoOrigem, saldoDestino
     IN
         contaOrigem := i_contas(co);
         contaDestino := i_contas(cd);
-        saldo := i_saldoCorrente(co);
+        saldoOrigem := i_saldoCorrente(co);
+        saldoDestino := i_saldoCorrente(cd);
         maxSaldo := MAXINT - valor;
         
         IF 
             contaOrigem = ativa & contaDestino = ativa &
-            valor >= 1 & valor <= saldo & saldo <= maxSaldo &
+            valor >= 1 & valor <= saldoOrigem & saldoDestino <= maxSaldo &
             valor <= limitePix & co /= contaDummy & cd /= contaDummy &
             tamTransacao <= maxTransacao
         THEN
+            i_saldoCorrente(co) := i_saldoCorrente(co) - valor;
+            i_saldoCorrente(cd) := i_saldoCorrente(cd) + valor;
             
-            VAR ii, atual IN
-                    ii := 0;
-                    atual := i_transacoes(ii);
-                    
-                    WHILE ii < maxTransacao & atual = TRUE DO
-                        ii := ii + 1;
-                        atual := i_transacoes(ii)
-    
-                    INVARIANT 
-                        ii : 0..maxTransacao &   
-                        ii : TRANSACAO &
-                        i_transacoes : TRANSACAO --> BOOL &
-                        transacoes = dom(i_transacoes |> {TRUE}) &
-                        (0..ii-1) <: dom(i_transacoes |> {TRUE}) &
-                        (atual = FALSE => (ii : TRANSACAO & ii /: transacoes))
-                    VARIANT 
-                        maxTransacao - ii
-                    END;
-                    
-                    i_saldoCorrente(co) := i_saldoCorrente(co) - valor;
-                    
-                    i_transacoes(ii) := TRUE;
-                    i_origem(ii) := co;
-                    i_destino(ii) := cd;
-                    i_valorTransacoes(ii) := valor;
-                    i_tipoTransacoes(ii) := tranPix;
-                    tamTransacao := tamTransacao + 1;
-                    
-                    ok := TRUE
-                END
+            i_transacoes(tamTransacao) := TRUE;
+            i_origem(tamTransacao) := co;
+            i_destino(tamTransacao) := cd;
+            i_valorTransacoes(tamTransacao) := valor;
+            i_tipoTransacoes(tamTransacao) := tranPix;
+            tamTransacao := tamTransacao + 1;
             
+            ok := TRUE
         ELSE
             ok := FALSE
         END
@@ -617,59 +520,41 @@ ok <-- pix(co, cd, valor) =
 ok <-- compraDebito(co, cd, valor) = 
     VAR 
         contaDestino, cartaoAtivo, cartaoBloqueado,
-        tipoCartao, titular, saldo, maxSaldo
+        tipoCartao, titular, saldoOrigem, saldoDestino, maxSaldo
     IN
         contaDestino := i_contas(cd);
         cartaoAtivo := i_cartoes(co);
         cartaoBloqueado := i_bloqueados(co);
         tipoCartao := i_tipoCartao(co);
         titular := i_titular(co);
-        saldo := i_saldoCorrente(titular);
+        saldoOrigem := i_saldoCorrente(co);
+        saldoDestino := i_saldoCorrente(cd);
         maxSaldo := MAXINT - valor;
         
         IF 
             contaDestino = ativa & cartaoAtivo = TRUE &
             cartaoBloqueado = FALSE & tipoCartao = debito &
-            titular /= cd & valor >= 1 & valor <= saldo & 
-            saldo <= maxSaldo & tamTransacao < maxTransacao &
+            titular /= cd & valor >= 1 & valor <= saldoOrigem & 
+            saldoDestino <= maxSaldo & tamTransacao <= maxTransacao &
             co /= cartaoDummy & cd /= contaDummy
         THEN
-            VAR ii, atual IN
-                    ii := 0;
-                    atual := i_transacoes(ii);
-                    
-                    WHILE ii < maxTransacao & atual = TRUE DO
-                        ii := ii + 1;
-                        atual := i_transacoes(ii)
-    
-                    INVARIANT 
-                        ii : 0..maxTransacao &   
-                        ii : TRANSACAO &
-                        i_transacoes : TRANSACAO --> BOOL &
-                        transacoes = dom(i_transacoes |> {TRUE}) &
-                        (0..ii-1) <: dom(i_transacoes |> {TRUE}) &
-                        (atual = FALSE => (ii : TRANSACAO & ii /: transacoes))
-                    VARIANT 
-                        maxTransacao - ii
-                    END;
-                    
-                    i_saldoCorrente(titular) := i_saldoCorrente(titular) - valor;
-                    
-                    i_transacoes(ii) := TRUE;
-                    i_origem(ii) := titular;
-                    i_destino(ii) := cd;
-                    i_valorTransacoes(ii) := valor;
-                    i_tipoTransacoes(ii) := tranDebito;
-                    tamTransacao := tamTransacao + 1;
-                    
-                    ok := TRUE
-               END
+            i_saldoCorrente(titular) := i_saldoCorrente(titular) - valor;
+            i_saldoCorrente(cd) := i_saldoCorrente(cd) + valor;
+            
+            i_transacoes(tamTransacao) := TRUE;
+            i_origem(tamTransacao) := titular;
+            i_destino(tamTransacao) := cd;
+            i_valorTransacoes(tamTransacao) := valor;
+            i_tipoTransacoes(tamTransacao) := tranDebito;
+            tamTransacao := tamTransacao + 1;
+            
+            ok := TRUE
         ELSE
             ok := FALSE
         END
         
     END;
-               
+         
 
 ok <-- bloquearCartao(ct) = 
     VAR 
