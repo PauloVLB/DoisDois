@@ -157,9 +157,93 @@ ok <-- adicionarConta(cc) =
         
     END;
 
-depositarCorrente(cc, valor) = skip;
+ok <-- depositarCorrente(cc, valor) = 
+    VAR 
+        statusConta, saldoCorrente, maxSaldo
+    IN
+        statusConta := i_contas(cc);
+        saldoCorrente := i_saldoCorrente(cc);
+        maxSaldo := MAXINT - valor;
+        IF 
+            statusConta = ativa & saldoCorrente <= maxSaldo & cc /= contaDummy &
+            tamTransacao < maxTransacao
+        THEN
+            i_saldoCorrente(cc) := i_saldoCorrente(cc) + valor;
+            VAR ii, atual IN
+                ii := 0;
+                atual := i_transacoes(ii);
+                
+                WHILE ii < maxTransacao & atual = TRUE DO
+                    ii := ii + 1;
+                    atual := i_transacoes(ii)
 
-depositarPoupanca(cc, valor) = skip;
+                INVARIANT 
+                    ii : 0..maxTransacao &   
+                    ii : TRANSACAO &
+                    i_transacoes : TRANSACAO --> BOOL &
+                    transacoes = dom(i_transacoes |> {TRUE}) &
+                    (0..ii-1) <: dom(i_transacoes |> {TRUE}) &
+                    (atual = FALSE => (ii : TRANSACAO & ii /: transacoes))
+                VARIANT 
+                    maxTransacao - ii
+                END;
+                
+                i_transacoes(ii) := TRUE;
+                i_origem(ii) := cc;
+                i_destino(ii) := cc;
+                i_valorTransacoes(ii) := valor;
+                i_tipoTransacoes(ii) := depositoCorrente;
+                tamTransacao := tamTransacao + 1
+           END;
+            ok := TRUE
+        ELSE
+            ok := FALSE
+        END
+END;
+
+ok <-- depositarPoupanca(cc, valor) = 
+    VAR 
+        statusConta, saldoPoupanca, maxSaldo
+    IN
+        statusConta := i_contas(cc);
+        saldoPoupanca := i_saldoPoupanca(cc);
+        maxSaldo := MAXINT - valor;
+        IF 
+            statusConta = ativa & saldoPoupanca <= maxSaldo & cc /= contaDummy &
+            tamTransacao < maxTransacao
+        THEN
+            i_saldoPoupanca(cc) := i_saldoPoupanca(cc) + valor;
+            VAR ii, atual IN
+                ii := 0;
+                atual := i_transacoes(ii);
+                
+                WHILE ii < maxTransacao & atual = TRUE DO
+                    ii := ii + 1;
+                    atual := i_transacoes(ii)
+
+                INVARIANT 
+                    ii : 0..maxTransacao &   
+                    ii : TRANSACAO &
+                    i_transacoes : TRANSACAO --> BOOL &
+                    transacoes = dom(i_transacoes |> {TRUE}) &
+                    (0..ii-1) <: dom(i_transacoes |> {TRUE}) &
+                    (atual = FALSE => (ii : TRANSACAO & ii /: transacoes))
+                VARIANT 
+                    maxTransacao - ii
+                END;
+                
+                i_transacoes(ii) := TRUE;
+                i_origem(ii) := cc;
+                i_destino(ii) := cc;
+                i_valorTransacoes(ii) := valor;
+                i_tipoTransacoes(ii) := depositoPoupanca;
+                tamTransacao := tamTransacao + 1
+           END;
+            ok := TRUE
+        ELSE
+            ok := FALSE
+        END
+END;
 
 ok <-- sacarCorrente(cc, valor) = 
 
@@ -199,8 +283,7 @@ ok <-- sacarCorrente(cc, valor) =
                     i_destino(ii) := cc;
                     i_valorTransacoes(ii) := valor;
                     i_tipoTransacoes(ii) := saqueCorrente;
-                    tamTransacao := tamTransacao + 1
-                    
+                    tamTransacao := tamTransacao + 1  
                END;
                
                ok := TRUE 
@@ -622,9 +705,47 @@ ok <-- desbloquearCartao(ct) =
         
     END;
 
-atualizarLimiteMax(ct, valor) = skip;
+ok <-- atualizarLimiteMax(ct, valor) = 
+    VAR 
+        tipoCartao, cartaoBloqueado, cartaoAtivo
+    IN
+        cartaoAtivo := i_cartoes(ct);
+        cartaoBloqueado := i_bloqueados(ct);
+        tipoCartao := i_tipoCartao(ct);
+        IF 
+            cartaoAtivo = TRUE & cartaoBloqueado = FALSE & tipoCartao = credito &
+            valor <= MAXINT & ct /= cartaoDummy
+        THEN
+            i_limiteMax(ct) := valor;
+            VAR limiteAtual IN
+                limiteAtual := i_limite(ct);
+                IF limiteAtual > valor THEN
+                    i_limite(ct) := valor
+                END
+            END
+        ELSE
+            ok := FALSE
+        END
+    END;
 
-atualizarLimite(ct, valor) = skip;
+ok <-- atualizarLimite(ct, valor) = 
+    VAR
+        tipoCartao, cartaoBloqueado, cartaoAtivo, limiteMaxCartao
+    IN
+        tipoCartao := i_tipoCartao(ct);
+        cartaoBloqueado := i_bloqueados(ct);
+        cartaoAtivo := i_cartoes(ct);
+        limiteMaxCartao := i_limiteMax(ct);
+        IF 
+            tipoCartao = credito & cartaoBloqueado = FALSE & cartaoAtivo = TRUE & 
+            0 <= valor & valor <= limiteMaxCartao
+        THEN
+            ok := TRUE;
+            i_limite(ct) := valor
+        ELSE
+            ok := FALSE
+        END 
+    END;
 
 removerConta(cc) = skip;
 

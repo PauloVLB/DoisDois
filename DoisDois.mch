@@ -131,40 +131,50 @@ ok <-- adicionarConta(cc) =
         END
     END;
 
-depositarCorrente(cc, valor) =
+ok <-- depositarCorrente(cc, valor) =
     PRE
-        cc : CONTA & cc : contas & valor : NAT1 & saldoCorrente(cc) + valor : NAT1 & cc /= contaDummy
+        cc : CONTA & valor : NAT1  
     THEN
-        saldoCorrente(cc) := saldoCorrente(cc) + valor ||
-        ANY
-            tt
-        WHERE
-            tt : TRANSACAO & tt /: transacoes
-        THEN
-            transacoes := transacoes \/ {tt} ||
-            origemTransacoes(tt) := cc ||
-            destinoTransacoes(tt) := cc ||
-            valorTransacoes(tt) := valor ||
-            tipoTransacoes(tt) := depositoCorrente
+        IF cc : contas & saldoCorrente(cc) + valor : NAT1 & cc /= contaDummy THEN
+            saldoCorrente(cc) := saldoCorrente(cc) + valor ||
+            ANY
+                tt
+            WHERE
+                tt : TRANSACAO & tt /: transacoes
+            THEN
+                transacoes := transacoes \/ {tt} ||
+                origemTransacoes(tt) := cc ||
+                destinoTransacoes(tt) := cc ||
+                valorTransacoes(tt) := valor ||
+                tipoTransacoes(tt) := depositoCorrente
+            END ||
+            ok := TRUE
+        ELSE
+            ok := FALSE    
         END
     END;
 
-depositarPoupanca(cc, valor) =
+ok <-- depositarPoupanca(cc, valor) =
     PRE
-        cc : CONTA & cc : contas & valor : NAT1 & saldoPoupanca(cc) + valor : NAT1 & cc /= contaDummy
+        cc : CONTA & valor : NAT1  
     THEN
-        saldoPoupanca(cc) := saldoPoupanca(cc) + valor ||
-        ANY
-            tt
-        WHERE
-            tt : TRANSACAO & tt /: transacoes
-        THEN
-            transacoes := transacoes \/ {tt} ||
-            origemTransacoes(tt) := cc ||
-            destinoTransacoes(tt) := cc ||
-            valorTransacoes(tt) := valor ||
-            tipoTransacoes(tt) := depositoPoupanca
-        END
+        IF cc : contas & saldoPoupanca(cc) + valor : NAT1 & cc /= contaDummy THEN
+            saldoPoupanca(cc) := saldoPoupanca(cc) + valor ||
+            ANY
+                tt
+            WHERE
+                tt : TRANSACAO & tt /: transacoes
+            THEN
+                transacoes := transacoes \/ {tt} ||
+                origemTransacoes(tt) := cc ||
+                destinoTransacoes(tt) := cc ||
+                valorTransacoes(tt) := valor ||
+                tipoTransacoes(tt) := depositoPoupanca
+            END ||
+            ok := TRUE
+        ELSE
+            ok := FALSE    
+        END 
     END;
         
 ok <-- sacarCorrente(cc, valor) =
@@ -438,25 +448,36 @@ ok <-- desbloquearCartao(ct) =
         END
     END;
     
-atualizarLimiteMax(ct, valor) =
+ok <-- atualizarLimiteMax(ct, valor) =
     PRE 
-        ct : CARTAO & ct: creditos & ct /: bloqueados &
-        valor : NAT & valor <= MAXINT & ct /= cartaoDummy
+        ct : CARTAO & 
+        valor : NAT 
     THEN
-        limiteMax(ct) := valor ||
-        IF 
-            limite(ct) > valor
-        THEN
-            limite(ct) := valor
+        IF ct: creditos & ct /: bloqueados & valor <= MAXINT & ct /= cartaoDummy THEN
+            limiteMax(ct) := valor ||
+            IF 
+                limite(ct) > valor
+            THEN
+                limite(ct) := valor
+            END ||
+            ok := TRUE
+        ELSE
+            ok := FALSE    
         END
+        
     END;
     
-atualizarLimite(ct, valor) = 
+ok <-- atualizarLimite(ct, valor) = 
     PRE 
-      ct : CARTAO & ct : creditos & ct /: bloqueados &
-      valor : 0..limiteMax(ct) & ct /= cartaoDummy
+      ct : CARTAO &
+      valor : NAT 
     THEN
-      limite(ct) := valor
+      IF ct : creditos & ct /: bloqueados & valor : 0..limiteMax(ct) & ct /= cartaoDummy THEN    
+          limite(ct) := valor ||
+          ok := TRUE
+      ELSE
+          ok := FALSE
+      END
     END;
     
 
