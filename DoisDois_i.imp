@@ -40,7 +40,7 @@ CONCRETE_VARIABLES
     i_limite, i_limiteMax, i_faturaOrdem,
     i_statusFatura, i_totalFatura, i_titular,
     i_faturaAtual, i_origem, i_destino, i_faturaCartao,
-    tamFatura, tamTransacao
+    tamFatura, tamTransacao, tamCredito
 INVARIANT
 
     i_contas: CONTA --> STATUSCONTA &
@@ -76,7 +76,6 @@ INVARIANT
     valorTransacoes = transacoes <| i_valorTransacoes &
     tipoTransacoes  = transacoes <| i_tipoTransacoes &
     
-    // mesmo problema de i_origem/i_destino
     i_titular : CARTAO --> CONTA &
     titular = cartoes <| i_titular &
     
@@ -105,7 +104,8 @@ INVARIANT
     
     /*auxiliares*/
     tamFatura : NAT & tamFatura = card(faturas) &
-    tamTransacao : NAT & tamTransacao = card(transacoes)
+    tamTransacao : NAT & tamTransacao = card(transacoes) &
+    tamCredito : NAT & tamCredito = card(creditos)
     
 DEFINITIONS     
     creditos == (tipoCartao~[{credito}])            
@@ -133,7 +133,8 @@ INITIALISATION
     i_faturaCartao := FATURA*{cartaoDummy};
     i_faturaOrdem := FATURA*{0};
     tamFatura := 0;
-    tamTransacao := 0
+    tamTransacao := 0;
+    tamCredito := 0
     
 
 OPERATIONS
@@ -212,17 +213,17 @@ ok <-- sacarCorrente(cc, valor) =
  
 ok <-- sacarPoupanca(cc, valor) = 
     VAR 
-        statusConta, saldoPoupanca, saldoCorrente, total
+        statusConta, saldoPoupanca, saldoCorrente, maxSaldo
     IN
         statusConta := i_contas(cc);
         saldoPoupanca := i_saldoPoupanca(cc);
         saldoCorrente := i_saldoCorrente(cc);
-        total := saldoCorrente + valor;
+        maxSaldo := MAXINT - valor;
         
         IF 
             statusConta = ativa & valor >= saqueMinPoupanca &
             valor <= saldoPoupanca & tamTransacao < maxTransacao &
-            valor >= 1 & total <= MAXINT & cc /= contaDummy
+            valor >= 1 & saldoCorrente <= maxSaldo & cc /= contaDummy
         THEN
             i_saldoPoupanca(cc) := i_saldoPoupanca(cc) -  valor;
             i_saldoCorrente(cc) := i_saldoCorrente(cc) + valor;
@@ -318,20 +319,20 @@ ok <-- adicionarCartao(ct, tp, cc) =
                      tp = credito
                  THEN
                      VAR ii, atual IN
-                        ii := 0;
+                        ii := 1; //desconsiderar dummy
                         atual := i_faturas(ii);
                     
                         WHILE ii < maxFatura & atual = TRUE DO
                             ii := ii + 1;
                             atual := i_faturas(ii)
                         INVARIANT 
-                            ii : 0..maxFatura &
+                            ii : 1..maxFatura &
                             i_faturas : FATURA --> BOOL &
                             faturas = dom(i_faturas |> {TRUE}) &
                             i_faturaAtual : CARTAO --> FATURA &
                             creditos <| i_faturaAtual : CARTAO >+> FATURA &
                             (ii <= maxFatura => atual = i_faturas(ii)) &
-                            (0..ii-1) <: dom(i_faturas |> {TRUE}) &
+                            (1..ii-1) <: dom(i_faturas |> {TRUE}) &
                             (atual = FALSE => (ii : FATURA & ii /: faturas))
                         VARIANT 
                             maxFatura - ii
@@ -345,7 +346,8 @@ ok <-- adicionarCartao(ct, tp, cc) =
                         i_faturaCartao(ii) := ct;
                         i_faturaOrdem(ii) := 0;
                         i_limite(ct) := limiteMaxPadrao;
-                        i_limiteMax(ct) := limiteMaxPadrao 
+                        i_limiteMax(ct) := limiteMaxPadrao;
+                        tamCredito := tamCredito + 1
                       END
                  END
              ELSE
@@ -372,7 +374,7 @@ ok <-- removerCartao(ct) =
         
             VAR ii, fatura, faturaCartao, statusFatura, totalFatura
             IN 
-                ii := 0;
+                ii := 1; //desconsiderar dummy
                 pagas := TRUE;
                 WHILE ii <= maxFatura & pagas = TRUE DO
                     fatura := i_faturas(ii);
@@ -386,13 +388,13 @@ ok <-- removerCartao(ct) =
                     END;
                     ii := ii + 1
                 INVARIANT
-                    ii : 0..(maxFatura + 1) &
+                    ii : 1..(maxFatura + 1) &
                     i_faturas : FATURA --> BOOL &
                     faturas = dom(i_faturas |> {TRUE}) &
                     i_faturaCartao : FATURA --> CARTAO &
                     i_statusFatura : FATURA --> STATUSFATURA &
                     i_totalFatura : FATURA --> NAT &
-                    pagas = TRUE <=> (((0..ii-1) /\ dom(i_faturas |> {TRUE}) /\ dom(i_faturaCartao |> {ct})) <: dom(i_statusFatura |> {paga}) \/ dom(i_totalFatura |> {0}))
+                    pagas = TRUE <=> (((1..ii-1) /\ dom(i_faturas |> {TRUE}) /\ dom(i_faturaCartao |> {ct})) <: dom(i_statusFatura |> {paga}) \/ dom(i_totalFatura |> {0}))
                 VARIANT 
                     maxFatura - ii + 1
                     
@@ -405,7 +407,7 @@ ok <-- removerCartao(ct) =
             THEN
                 
                  VAR ii, fatura, cartao IN
-                    ii := 0;
+                    ii := 1;
                     
                     WHILE ii <= maxFatura DO
                         fatura := i_faturas(ii);
@@ -418,19 +420,19 @@ ok <-- removerCartao(ct) =
                         END; // DO IF INTERNO
                         ii := ii + 1
                     INVARIANT
-                        ii : 0..(maxFatura + 1) &
+                        ii : 1..(maxFatura + 1) &
                         i_faturas : FATURA --> BOOL &
                         i_faturaCartao: FATURA --> CARTAO &
-                        ((0..ii-1) /\ dom(i_faturaCartao |> {ct})) <: dom(i_faturas |> {FALSE})
+                        ((1..ii-1) /\ dom(i_faturaCartao |> {ct})) <: dom(i_faturas |> {FALSE})
                         // o que espero : faturas := faturas - faturasCartao
                     VARIANT
                         maxFatura + 1 - ii
                     END 
-                END 
+                END;
+                i_cartoes(ct) := FALSE;
+                i_bloqueados(ct) := FALSE;  
+                tamCredito := tamCredito - 1
             END;
-            
-            i_cartoes(ct) := FALSE;
-            i_bloqueados(ct) := FALSE;  
             
             ok := pagas    
         ELSIF 
@@ -478,18 +480,18 @@ compraParcelada(co, cd, valor, parcelas) = skip;
 
 ok <-- pix(co, cd, valor) = 
     VAR 
-        contaOrigem, contaDestino, saldo, total
+        contaOrigem, contaDestino, saldo, maxSaldo
     IN
         contaOrigem := i_contas(co);
         contaDestino := i_contas(cd);
         saldo := i_saldoCorrente(co);
-        total := valor + saldo;
+        maxSaldo := MAXINT - valor;
         
         IF 
             contaOrigem = ativa & contaDestino = ativa &
-            valor >= 1 & valor <= saldo & total < MAXINT &
+            valor >= 1 & valor <= saldo & saldo <= maxSaldo &
             valor <= limitePix & co /= contaDummy & cd /= contaDummy &
-            tamTransacao < maxTransacao
+            tamTransacao <= maxTransacao
         THEN
             
             VAR ii, atual IN
@@ -532,7 +534,7 @@ ok <-- pix(co, cd, valor) =
 ok <-- compraDebito(co, cd, valor) = 
     VAR 
         contaDestino, cartaoAtivo, cartaoBloqueado,
-        tipoCartao, titular, saldo, total
+        tipoCartao, titular, saldo, maxSaldo
     IN
         contaDestino := i_contas(cd);
         cartaoAtivo := i_cartoes(co);
@@ -540,13 +542,13 @@ ok <-- compraDebito(co, cd, valor) =
         tipoCartao := i_tipoCartao(co);
         titular := i_titular(co);
         saldo := i_saldoCorrente(titular);
-        total := saldo + valor;
+        maxSaldo := MAXINT - valor;
         
         IF 
             contaDestino = ativa & cartaoAtivo = TRUE &
             cartaoBloqueado = FALSE & tipoCartao = debito &
             titular /= cd & valor >= 1 & valor <= saldo & 
-            total < MAXINT & tamTransacao < maxTransacao &
+            saldo <= maxSaldo & tamTransacao < maxTransacao &
             co /= cartaoDummy & cd /= contaDummy
         THEN
             VAR ii, atual IN
@@ -628,7 +630,231 @@ atualizarLimite(ct, valor) = skip;
 
 removerConta(cc) = skip;
 
-ok <-- passarMes = skip;
+ok <-- passarMes = 
+    VAR 
+        poupancaPassou, faturaPassou,
+        copiaSaldoPoupanca, copiaTotalFatura,
+        proximasFaturas, cartoesComProxima, faturasNecessarias
+    IN
+        poupancaPassou := TRUE;
+        
+        copiaSaldoPoupanca := i_saldoPoupanca;
+        /* verifica se aplicar rendimento gera overflow */
+        VAR
+            ii, contaAtual, saldoAtual, limite
+        IN
+            ii := 0;
+            saldoAtual := 0;
+            WHILE ii <= maxConta & poupancaPassou = TRUE DO
+                contaAtual := i_contas(ii);
+                saldoAtual := copiaSaldoPoupanca(ii);
+                limite := MAXINT/taxaRendimento;
+                
+                IF 
+                    contaAtual = ativa & saldoAtual > limite 
+                THEN
+                    poupancaPassou := FALSE
+                ELSE
+                    copiaSaldoPoupanca(ii) := i_saldoPoupanca(ii) * taxaRendimento
+                END;
+                ii := ii + 1
+            INVARIANT
+                ii : 0..(maxConta + 1) &
+                i_contas: CONTA --> STATUSCONTA &
+                contas = dom(i_contas |> {ativa}) &
+                i_saldoPoupanca : CONTA --> NAT &
+                saldoPoupanca = contas <| i_saldoPoupanca &
+                copiaSaldoPoupanca : CONTA --> NAT &
+                !cc.(cc : ((0..ii-1) /\ dom(i_contas |> {ativa})) & i_saldoPoupanca(cc) <= MAXINT/taxaRendimento => copiaSaldoPoupanca(cc) = (i_saldoPoupanca(cc) * taxaRendimento)) &
+                (poupancaPassou = TRUE <=> (ran(dom(((0..ii-1) <| i_contas) |> {ativa}) <| i_saldoPoupanca) <: 0..(MAXINT/taxaRendimento)))
+                
+            VARIANT
+                maxConta + 1 - ii
+            END
+        END; // var de poup
+        
+        IF 
+            poupancaPassou = TRUE
+        THEN
+        /* verifica se aplicar juros gera overflow e se existe proxima fatura para cartoes*/
+            faturaPassou:= TRUE;
+            proximasFaturas := CARTAO * {faturaDummy};
+            copiaTotalFatura := i_totalFatura;
+            cartoesComProxima := 0;
+            VAR 
+                ii, atual, cartaoFatura, faturaAtualCartao, 
+                ordemAtual, ordemFaturaAtual, statusFaturaAtual,
+                totalFaturaAtual, maxJuros, proximaOrdem
+            IN
+                ii := 1;
+                WHILE ii <= maxFatura & faturaPassou = TRUE DO
+                    atual := i_faturas(ii);
+                    
+                    IF 
+                        atual = TRUE
+                    THEN
+                        cartaoFatura := i_faturaCartao(ii);
+                        faturaAtualCartao := i_faturaAtual(cartaoFatura);
+                        
+                        ordemAtual := i_faturaOrdem(ii);
+                        ordemFaturaAtual := i_faturaOrdem(faturaAtualCartao);
+                        proximaOrdem := ordemFaturaAtual + 1;
+                        statusFaturaAtual := i_statusFatura(ii);
+                        
+                        totalFaturaAtual := i_totalFatura(ii);
+                        maxJuros := MAXINT/jurosFatura;
+                        
+                        IF 
+                            ordemAtual <= ordemFaturaAtual &
+                            (statusFaturaAtual = aberta or statusFaturaAtual = vencida)
+                            
+                        THEN
+                            IF 
+                                totalFaturaAtual > maxJuros
+                            THEN
+                                faturaPassou := FALSE
+                            ELSE
+                                copiaTotalFatura(ii) := copiaTotalFatura(ii) * jurosFatura
+                            END
+                        END;
+                        
+                        /* verifica se tem próxima fatura*/
+                         IF 
+                             ordemAtual = proximaOrdem 
+                         THEN
+                              proximasFaturas(cartaoFatura) := ii;
+                              cartoesComProxima := cartoesComProxima + 1
+                         END     
+                    END;       
+                    ii := ii + 1
+                INVARIANT
+                    ii : 1..(maxFatura + 1) &
+                    i_faturas : FATURA --> BOOL &
+                    faturas = dom(i_faturas |> {TRUE}) &
+                    i_faturaAtual : CARTAO --> FATURA &
+                    i_faturaCartao: FATURA --> CARTAO &
+                    i_faturaOrdem : FATURA --> NAT &
+                    i_statusFatura : FATURA --> STATUSFATURA &
+                    i_totalFatura : FATURA --> NAT &
+                    totalFatura = faturas <| i_totalFatura &
+                    copiaTotalFatura : FATURA --> NAT &
+                    proximasFaturas : CARTAO --> FATURA &
+                    cartoesComProxima : NAT &
+                    !cc.(cc : ((1..ii-1) /\ dom(i_faturas |> {TRUE})) & i_totalFatura(cc) <= MAXINT/jurosFatura => copiaTotalFatura(cc) = (i_totalFatura(cc) * jurosFatura)) &
+                    (faturaPassou = TRUE <=> (!ff.((ff : ((1..ii-1)  /\ dom(i_faturas |> {TRUE})) & i_faturaOrdem(ff) <=        i_faturaOrdem(i_faturaAtual(i_faturaCartao(ff))) & (i_statusFatura(ff) : {vencida, aberta})) 
+                => i_totalFatura(ff) * jurosFatura <= MAXINT))) &
+       { ff | ff : (1 .. ii - 1) & i_faturas(ff) = TRUE & i_faturaOrdem(ff) = i_faturaOrdem(i_faturaAtual(i_faturaCartao(ff))) + 1 } <:  ran(proximasFaturas |>> {faturaDummy}) &
+           cartoesComProxima = card(proximasFaturas |>> {faturaDummy})
+  
+                VARIANT
+                    maxFatura + 1 - ii
+                END
+            END; //var de fatura
+            
+            faturasNecessarias := tamFatura + (tamCredito - cartoesComProxima);
+            
+            IF 
+                faturasNecessarias <= maxFatura
+            THEN
+                VAR
+                    ii, cartaoAtivo, tipoAtual, faturaAtualCartao,
+                    statusAtual, totalAtual, ff, atual, ordemAtual, 
+                    proximaFatura
+                IN
+                    ii := 0;
+                    
+                    WHILE ii <= maxCartao DO
+                        cartaoAtivo := i_cartoes(ii);
+                        tipoAtual := i_tipoCartao(ii);
+                        
+                        IF
+                            cartaoAtivo = TRUE & tipoAtual = credito
+                        THEN
+                            faturaAtualCartao := i_faturaAtual(ii);
+                            statusAtual := i_statusFatura(faturaAtualCartao);
+                            totalAtual := i_totalFatura(faturaAtualCartao);
+                            
+                            IF
+                                statusAtual = aberta & totalAtual > 0
+                            THEN
+                                i_statusFatura(faturaAtualCartao) := vencida
+                            ELSIF
+                                statusAtual = aberta & totalAtual = 0
+                            THEN
+                                i_statusFatura(faturaAtualCartao) := paga
+                            END;
+                            
+                            proximaFatura := proximasFaturas(ii);
+                            
+                            IF
+                               proximaFatura = faturaDummy
+                            THEN
+                                ff := 1;
+                                atual := i_faturas(ff);
+                                
+                                WHILE ff < maxFatura & atual = TRUE DO
+                                    ff := ff + 1;
+                                    atual := i_faturas(ff)
+                                INVARIANT 
+                                    ff : 1..maxFatura &
+                                    i_faturas : FATURA --> BOOL &
+                                    faturas = dom(i_faturas |> {TRUE}) &
+                                    i_faturaAtual : CARTAO --> FATURA &
+                                    (ff <= maxFatura => atual = i_faturas(ff)) &
+                                    (1..ff-1) <: dom(i_faturas |> {TRUE}) &
+                                    (atual = FALSE => (ff : FATURA & ff /: faturas))
+                                VARIANT 
+                                    maxFatura - ff
+                                END;
+                                
+                                ordemAtual := i_faturaOrdem(faturaAtualCartao);
+                                
+                                i_faturas(ff) := TRUE;
+                                i_faturaCartao(ff) := ii;  
+                                i_faturaAtual(ii) := ff;
+                                i_faturaOrdem(ff) := ordemAtual + 1;
+                                i_statusFatura(ff) := aberta;
+                                copiaTotalFatura(ff) := 0;
+                                tamFatura := tamFatura + 1
+                            ELSE
+                                i_faturaAtual(ii) := proximaFatura
+                            END
+                         END;
+                        
+                        ii := ii + 1
+                    INVARIANT
+                        ii : 0..(maxCartao + 1) &
+                        i_cartoes : CARTAO --> BOOL &
+                        cartoes = dom(i_cartoes |> {TRUE}) &
+                        i_faturas : FATURA --> BOOL &
+                        faturas = dom(i_faturas |> {TRUE}) &
+                        i_statusFatura : FATURA --> STATUSFATURA &
+                        i_totalFatura : FATURA --> NAT &
+                        statusFatura = faturas <| i_statusFatura &
+                        totalFatura = faturas <| i_totalFatura &
+                        i_faturaAtual : CARTAO --> FATURA &
+                        creditos <| i_faturaAtual : CARTAO >+> FATURA &
+                        faturaAtual = creditos <| i_faturaAtual &
+                        i_faturaCartao: FATURA --> CARTAO &
+                        faturaCartao =  (faturas <| i_faturaCartao) |> creditos &
+                        i_faturaOrdem : FATURA --> NAT &
+                        faturaOrdem = faturas <| i_faturaOrdem  
+                    VARIANT
+                        maxCartao + 1 - ii
+                    END
+                END; // var de cartoes
+                
+                i_saldoPoupanca := copiaSaldoPoupanca;
+                i_totalFatura := copiaTotalFatura;
+                ok := TRUE
+            ELSE
+                ok := FALSE
+            END
+            
+        ELSE
+            ok := FALSE
+       END 
+    END;
 
 
 ccs <-- consultarContas = 
