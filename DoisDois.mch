@@ -481,43 +481,47 @@ ok <-- atualizarLimite(ct, valor) =
     END;
     
 
-removerConta(cc) = 
+ok <-- removerConta(cc) = 
     PRE
-        cc : CONTA &
-        cc : contas &
-        cc /: contasRemovidas &
-        !ct . ((ct : creditos & titular(ct) = cc) => (faturaCartao~[{ct}] <: statusFatura~[{paga}] \/ totalFatura~[{0}])) &
-        cc /= contaDummy
+        cc : CONTA 
     THEN
-        LET
-            cts
-        BE
-            cts = titular~[{cc}]
-        IN
-            cartoes := cartoes - cts ||
-            bloqueados := cartoes - cts ||
-            tipoCartao := cts <<| tipoCartao ||
-            titular := titular |>> {cc} ||
-            LET 
-                faturasCartao 
-            BE 
-                faturasCartao = faturaCartao~[cts] 
+        IF 
+            cc : contas & cc /: contasRemovidas &
+            !ct . ((ct : creditos & titular(ct) = cc) => (faturaCartao~[{ct}] <: statusFatura~[{paga}] \/ totalFatura~[{0}])) &
+            cc /= contaDummy
+        THEN
+            LET
+                cts
+            BE
+                cts = titular~[{cc}]
             IN
-                limite := cts <<| limite ||
-                limiteMax := cts <<| limiteMax ||
-                faturas := faturas - faturasCartao ||
-                statusFatura := faturasCartao <<| statusFatura ||
-                totalFatura := faturasCartao <<| totalFatura ||
-                faturaCartao := faturasCartao <<| faturaCartao ||
-                faturaOrdem := faturasCartao <<| faturaOrdem ||
-                faturaAtual := cts <<| faturaAtual 
-                
-            END
-        END ||
-        contas := contas - {cc} ||
-        saldoCorrente := {cc} <<| saldoCorrente ||
-        saldoPoupanca := {cc} <<| saldoPoupanca ||
-        contasRemovidas := contasRemovidas \/ {cc}
+                cartoes := cartoes - cts ||
+                bloqueados := bloqueados - cts ||
+                tipoCartao := cts <<| tipoCartao ||
+                titular := titular |>> {cc} ||
+                LET 
+                    faturasCartao 
+                BE 
+                    faturasCartao = faturaCartao~[cts] 
+                IN
+                    limite := cts <<| limite ||
+                    limiteMax := cts <<| limiteMax ||
+                    faturas := faturas - faturasCartao ||
+                    statusFatura := faturasCartao <<| statusFatura ||
+                    totalFatura := faturasCartao <<| totalFatura ||
+                    faturaCartao := faturasCartao <<| faturaCartao ||
+                    faturaOrdem := faturasCartao <<| faturaOrdem ||
+                    faturaAtual := cts <<| faturaAtual 
+                END
+            END ||
+            contas := contas - {cc} ||
+            saldoCorrente := {cc} <<| saldoCorrente ||
+            saldoPoupanca := {cc} <<| saldoPoupanca ||
+            contasRemovidas := contasRemovidas \/ {cc} ||
+            ok := TRUE
+        ELSE
+            ok := FALSE    
+        END
     END;
 
 

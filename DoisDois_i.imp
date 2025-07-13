@@ -749,7 +749,104 @@ ok <-- atualizarLimite(ct, valor) =
         END 
     END;
 
-removerConta(cc) = skip;
+ok <-- removerConta(cc) =
+    VAR
+        statusConta, possuiFaturaNaoPaga
+    IN
+        statusConta := i_contas(cc);
+        possuiFaturaNaoPaga := FALSE;
+        
+        IF
+            cc <= maxConta & statusConta = ativa & cc /= contaDummy
+        THEN
+            VAR ii, cartaoAtivo, titularCartao IN
+                ii := 0;
+                cartaoAtivo := i_cartoes(ii);
+                titularCartao := i_titular(ii);
+                WHILE ii <= maxCartao & possuiFaturaNaoPaga = FALSE DO
+                    IF cartaoAtivo = TRUE & titularCartao = cc THEN
+                        VAR jj, faturaAtiva, faturaCartao IN
+                            jj := 0;
+                            faturaAtiva := i_faturas(jj);
+                            faturaCartao := i_faturaCartao(jj);
+                            WHILE jj <= maxFatura & possuiFaturaNaoPaga = FALSE DO
+                                IF faturaAtiva = TRUE & faturaCartao = ii THEN
+                                    VAR statusFatura, totalFatura IN
+                                        statusFatura := i_statusFatura(jj);
+                                        totalFatura := i_totalFatura(jj);
+                                        
+                                        IF statusFatura /= paga & totalFatura > 0 THEN
+                                            possuiFaturaNaoPaga := TRUE
+                                        END
+                                    END
+                                END;
+                                jj := jj + 1
+                            INVARIANT
+                                1 /= 1
+                            VARIANT
+                                maxFatura + 1 - jj
+                            END
+                        END
+                    END;
+                    ii := ii + 1
+                INVARIANT
+                    1 /= 1
+                VARIANT
+                    maxCartao + 1 - ii
+                END
+            END;
+            
+            IF possuiFaturaNaoPaga = FALSE THEN
+                VAR ii, cartaoAtivo, titularCartao, tipoCartao IN
+                    ii := 0;
+                    cartaoAtivo := i_cartoes(ii);
+                    titularCartao := i_titular(ii);
+                    tipoCartao := i_tipoCartao(ii);
+                    WHILE ii <= maxCartao DO
+                        IF cartaoAtivo = TRUE & titularCartao = cc THEN
+                            VAR jj, faturaAtiva, faturaCartao IN
+                                jj := 0;
+                                faturaAtiva := i_faturas(jj);
+                                faturaCartao := i_faturaCartao(jj);
+                                WHILE jj <= maxFatura DO
+                                    IF faturaAtiva = TRUE & faturaCartao = ii THEN
+                                        i_faturas(jj) := FALSE;
+                                        tamFatura := tamFatura - 1
+                                    END;
+                                    jj := jj + 1
+                                INVARIANT
+                                    jj : 0..(maxFatura + 1)
+                                VARIANT
+                                    maxFatura + 1 - jj
+                                END
+                            END;
+                            
+                            i_cartoes(ii) := FALSE;
+                            i_bloqueados(ii) := FALSE;
+                            
+                            IF tipoCartao = credito THEN
+                                tamCredito := tamCredito - 1
+                            END
+                        END;
+                        ii := ii + 1
+                    INVARIANT
+                        ii : 0..(maxCartao + 1)
+                    VARIANT
+                        maxCartao + 1 - ii
+                    END
+                END;
+                
+                i_contas(cc) := removida;
+                i_saldoCorrente(cc) := 0;
+                i_saldoPoupanca(cc) := 0;
+                ok := TRUE
+            ELSE
+                ok := FALSE
+            END
+        ELSE
+            ok := FALSE
+        END
+    END;
 
 ok <-- passarMes = 
     VAR 
