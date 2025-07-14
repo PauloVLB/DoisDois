@@ -331,7 +331,8 @@ ok <-- compraParcelada(co, cd, valor, parcelas) =
             co : creditos & cd : contas & titular(co) /= cd & parcelas : 1..maxParcelas & 
             (valor / parcelas) : NAT & (valor / parcelas) <= limite(co) &
             saldoCorrente(cd) + valor : NAT &
-            !ff.(ff : faturasExistentes(co, parcelas) => (totalFatura(ff) + valor/parcelas) : NAT)
+            !ff.(ff : faturasExistentes(co, parcelas) => (totalFatura(ff) + valor/parcelas) : NAT) &
+            co /= cartaoDummy & cd /= contaDummy
         THEN
             LET 
                 ordensAusentes, parcela
@@ -372,8 +373,7 @@ ok <-- compraParcelada(co, cd, valor, parcelas) =
         ELSE
             ok := FALSE
         END
-    END
-       
+    END;
 
 // dps add proibição de dummy
 ok <-- pix(co, cd, valor) =
