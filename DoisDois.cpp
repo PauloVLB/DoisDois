@@ -99,7 +99,7 @@ void showTemporaryMessage(int y, int x, const std::string& message) {
     for (size_t i = 0; i < wstring_width(w_message); ++i) {
         mvwaddch(stdscr, y, x + i, ' ');
     }
-    move(y + 1, x);
+    move(y + 2, x);
     clrtoeol();
 }
 
