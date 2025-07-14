@@ -40,7 +40,8 @@ CONCRETE_VARIABLES
     i_limite, i_limiteMax, i_faturaOrdem,
     i_statusFatura, i_totalFatura, i_titular,
     i_faturaAtual, i_origem, i_destino, i_faturaCartao,
-    tamFatura, tamTransacao, tamCredito
+    tamFatura, tamTransacao, tamCredito,
+    tamCartao, tamConta
 INVARIANT
 
     i_contas: CONTA --> STATUSCONTA &
@@ -106,7 +107,10 @@ INVARIANT
     tamFatura : NAT & tamFatura = card(faturas) &
     tamTransacao : NAT & tamTransacao = card(transacoes) &
     0..tamTransacao-1 = transacoes &
-    tamCredito : NAT & tamCredito = card(creditos)
+    tamCredito : NAT & tamCredito = card(creditos) &
+    
+    tamConta : NAT & tamConta = card(contas) + card(contasRemovidas) &
+    tamCartao : NAT & tamCartao = card(cartoes) 
     
 DEFINITIONS     
     creditos == (tipoCartao~[{credito}])            
@@ -135,7 +139,9 @@ INITIALISATION
     i_faturaOrdem := FATURA*{0};
     tamFatura := 0;
     tamTransacao := 0;
-    tamCredito := 0
+    tamCredito := 0;
+    tamCartao := 0;
+    tamConta := 0
     
 
 OPERATIONS
@@ -146,11 +152,13 @@ ok <-- adicionarConta(cc) =
         IN
             status := i_contas(cc);   
             IF 
-                cc <= maxConta & status = livre & cc /= contaDummy
+                cc <= maxConta & status = livre &
+                cc /= contaDummy & tamConta < maxConta
             THEN
                 i_contas(cc) := ativa;
                 i_saldoCorrente(cc) := 0;
                 i_saldoPoupanca(cc) := 0;
+                tamConta := tamConta + 1;
                 ok := TRUE
             ELSE
                 ok := FALSE
@@ -272,10 +280,9 @@ ok <-- adicionarCartao(ct, tp, cc) =
         statusConta := i_contas(cc) ;
         statusCartao := i_cartoes(ct);
         temFatura := bool(tp = debito or tamFatura < maxFatura);
-        
         IF 
             statusCartao = FALSE & statusConta = ativa & temFatura = TRUE &
-            cc /= contaDummy & ct /= cartaoDummy
+            cc /= contaDummy & ct /= cartaoDummy & tamCartao < maxCartao
         THEN
             cartaoDuplicado := FALSE;
             VAR ii IN
@@ -317,7 +324,7 @@ ok <-- adicionarCartao(ct, tp, cc) =
                  i_cartoes(ct) := TRUE;
                  i_tipoCartao(ct) := tp;
                  i_titular(ct) := cc;
-                 
+                 tamCartao := tamCartao + 1;               
                  ok := TRUE;
                  
                  IF 
@@ -402,7 +409,6 @@ ok <-- removerCartao(ct) =
                     pagas = TRUE <=> (((1..ii-1) /\ dom(i_faturas |> {TRUE}) /\ dom(i_faturaCartao |> {ct})) <: dom(i_statusFatura |> {paga}) \/ dom(i_totalFatura |> {0}))
                 VARIANT 
                     maxFatura - ii + 1
-                    
                 END // WHILE
             END;
             
@@ -429,22 +435,23 @@ ok <-- removerCartao(ct) =
                         i_faturas : FATURA --> BOOL &
                         i_faturaCartao: FATURA --> CARTAO &
                         ((1..ii-1) /\ dom(i_faturaCartao |> {ct})) <: dom(i_faturas |> {FALSE})
-                        // o que espero : faturas := faturas - faturasCartao
                     VARIANT
                         maxFatura + 1 - ii
                     END 
                 END;
+                
                 i_cartoes(ct) := FALSE;
                 i_bloqueados(ct) := FALSE;  
-                tamCredito := tamCredito - 1
+                tamCredito := tamCredito - 1;
+                tamCartao := tamCartao - 1
             END;
-            
             ok := pagas    
         ELSIF 
             cartaoAtivo = TRUE & tipoCartao = debito
         THEN 
             i_cartoes(ct) := FALSE;
             i_bloqueados(ct) := FALSE;  
+            tamCartao := tamCartao - 1; 
             ok := TRUE
         ELSE 
             ok := FALSE
@@ -708,6 +715,8 @@ ok <-- removerConta(cc) =
                             
                             i_cartoes(ii) := FALSE;
                             i_bloqueados(ii) := FALSE;
+                            tamCartao := tamCartao - 1;
+
                             
                             IF tipoCartao = credito THEN
                                 tamCredito := tamCredito - 1
@@ -720,7 +729,6 @@ ok <-- removerConta(cc) =
                         maxCartao + 1 - ii
                     END
                 END;
-                
                 i_contas(cc) := removida;
                 i_saldoCorrente(cc) := 0;
                 i_saldoPoupanca(cc) := 0;
@@ -1083,13 +1091,14 @@ ok, oo, dd, vv, tp <-- consultarTransacao(tt) =
     
 ok, ftCartao <-- consultarFaturasCartao(ct) = 
     VAR
-        cartaoAtivo
+        cartaoAtivo, tipo
     IN 
         cartaoAtivo := i_cartoes(ct);
         ftCartao := (0..maxFatura)*{FALSE};
+        tipo := i_tipoCartao(ct);
         
         IF 
-            cartaoAtivo = TRUE 
+            cartaoAtivo = TRUE & tipo = credito & ct /= cartaoDummy
         THEN
             
             VAR ii IN
@@ -1134,7 +1143,7 @@ ok, ct, tt, oo, st, atual <-- consultarFatura(ff) =
         faturaAtiva := i_faturas(ff);
         
         IF 
-            faturaAtiva = TRUE
+            faturaAtiva = TRUE 
         THEN
             ct := i_faturaCartao(ff);
             tt := i_totalFatura(ff);
@@ -1161,7 +1170,7 @@ ok, vf <-- consultarValorFatura(ct) =
         tipoCartao := i_tipoCartao(ct);
         
         IF 
-            cartaoAtivo = TRUE & tipoCartao = credito
+            cartaoAtivo = TRUE & tipoCartao = credito & ct /= cartaoDummy
         THEN
             VAR 
                 faturaAtual 
@@ -1250,18 +1259,45 @@ ok, tipo, ll, llMax, block <-- consultarCartao(ct) =
         END
     END;
 
-ok <-- pre_compraParcelada(co, cd, valor, parcelas) = skip;
-
-ok <-- pre_atualizarLimiteMax(ct, valor) = skip;
-
-ok <-- pre_atualizarLimite(ct, valor) = skip;
-
-ok <-- pre_consultarValorFatura(ct) = skip;
-
-ok <-- pre_removerConta(cc) = skip;
-
-ok <-- pre_consultarFaturasCartao(ct) = skip;
-
-ok <-- pre_consultarFatura(ff) = skip
+ok, prox <-- proximaConta =
+    IF
+        tamConta < maxConta
+    THEN
+        prox := tamConta + 1;
+        ok := TRUE
+    ELSE
+        prox := contaDummy;
+        ok := FALSE
+    END;
     
+ok, prox <-- proximoCartao =
+    IF
+        tamCartao < maxCartao
+    THEN
+        VAR ii, atual IN
+                ii := 1;
+                atual := i_cartoes(ii);
+                
+                WHILE ii < maxCartao & atual = TRUE DO
+                    ii := ii + 1;
+                    atual := i_cartoes(ii)
+
+                INVARIANT 
+                    ii : 1..maxCartao &   
+                    i_cartoes : CARTAO --> BOOL &
+                    cartoes = dom(i_cartoes |> {TRUE}) &
+                    (1..ii-1) <: dom(i_cartoes |> {TRUE}) &
+                    (atual = FALSE => (ii : CARTAO & ii /: cartoes))
+                VARIANT 
+                    maxCartao - ii
+                 END;
+                 prox := ii
+          END;
+        
+        ok := TRUE
+    ELSE
+        prox := cartaoDummy;
+        ok := FALSE
+    END
+
 END

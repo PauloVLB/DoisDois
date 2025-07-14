@@ -120,7 +120,8 @@ ok <-- adicionarConta(cc) =
         cc : CONTA 
     THEN
         IF 
-            cc /: contas & cc /: contasRemovidas & cc /= contaDummy
+            cc /: contas & cc /: contasRemovidas & cc /= contaDummy &
+            CONTA - contas - contasRemovidas /= {}
         THEN
             contas := contas \/ {cc} ||
             saldoCorrente(cc) := 0 ||
@@ -135,8 +136,10 @@ ok <-- depositarCorrente(cc, valor) =
     PRE
         cc : CONTA & valor : NAT1  
     THEN
-        IF cc : contas & saldoCorrente(cc) + valor : NAT1 & cc /= contaDummy THEN
-            saldoCorrente(cc) := saldoCorrente(cc) + valor ||
+        IF cc : contas & saldoCorrente(cc) + valor : NAT1 &
+            cc /= contaDummy & TRANSACAO - transacoes /= {}
+        THEN
+            saldoCorrente(cc) := saldoCorrente(cc) + valor   ||
             ANY
                 tt
             WHERE
@@ -158,7 +161,9 @@ ok <-- depositarPoupanca(cc, valor) =
     PRE
         cc : CONTA & valor : NAT1  
     THEN
-        IF cc : contas & saldoPoupanca(cc) + valor : NAT1 & cc /= contaDummy THEN
+        IF cc : contas & saldoPoupanca(cc) + valor : NAT1 &
+            cc /= contaDummy & TRANSACAO - transacoes /= {}
+        THEN
             saldoPoupanca(cc) := saldoPoupanca(cc) + valor ||
             ANY
                 tt
@@ -238,7 +243,8 @@ ok <-- adicionarCartao(ct, tp, cc) =
     THEN
         IF 
            ct /: cartoes & cc : contas & tipoCartao~[{tp}] /\ titular~[{cc}] = {} & 
-        (tp = credito => (FATURA - faturas /= {})) & ct /= cartaoDummy & cc /= contaDummy 
+        (tp = credito => (FATURA - faturas /= {})) & ct /= cartaoDummy & cc /= contaDummy &
+        CARTAO - cartoes /= {}
         
         THEN
             cartoes := cartoes \/ {ct} ||
@@ -664,7 +670,7 @@ ok, ftCartao <-- consultarFaturasCartao(ct) =
         ct : CARTAO 
     THEN
         IF 
-            ct : cartoes & ct /= cartaoDummy 
+            ct : cartoes & ct /= cartaoDummy & tipoCartao(ct) = credito
         THEN
             ANY ffList
             WHERE
@@ -715,7 +721,7 @@ ok, vf <-- consultarValorFatura(ct) =
         ct : CARTAO 
     THEN
         IF 
-            ct : creditos
+            ct : creditos & ct /= cartaoDummy
         THEN
             vf := totalFatura(faturaAtual(ct)) ||
             ok := TRUE
@@ -771,126 +777,42 @@ ok, tipo, ll, llMax, block <-- consultarCartao(ct) =
     END;
 
 
-
-/* --- operações para confirmar pré-condição ---*/
-
-
-
-ok <-- pre_compraParcelada(co, cd, valor, parcelas) =
-    PRE
-        co : CARTAO & cd : CONTA & valor : NAT & parcelas : NAT
+ok, prox <-- proximaConta =
+    IF
+        CONTA - contas - contasRemovidas /= {}
     THEN
-        IF 
-            co : creditos &
-            cd : contas &
-            titular(co) /= cd &
-            valor : NAT1 &
-            parcelas : 1..maxParcelas &
-            (valor / parcelas) : NAT &
-            co /: bloqueados &
-            (valor / parcelas) <= limite(co) &
-            saldoCorrente(cd) + valor : NAT &
-            !ff.(ff : faturasExistentes(co, parcelas) => (totalFatura(ff) + valor/parcelas) : NAT)
+        ANY
+            cc
+        WHERE
+            cc : CONTA & cc /: contas & cc /: contasRemovidas
         THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-
+            prox := cc
+        END ||
+        ok := TRUE
+    ELSE
+        prox := contaDummy ||
+        ok := FALSE
     END;
-
-
-ok <-- pre_atualizarLimiteMax(ct, valor) =
-    PRE
-        ct : CARTAO & valor : NAT
+    
+ok, prox <-- proximoCartao =
+    IF
+        CARTAO - cartoes /= {}
     THEN
-        IF 
-            ct: creditos & 
-            ct /: bloqueados & valor : NAT & 
-            valor <= MAXINT 
+        ANY
+            ct
+        WHERE
+            ct : CARTAO & ct /: cartoes
         THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-
-    END;
-
-ok <-- pre_atualizarLimite(ct, valor) =
-    PRE
-        ct : CARTAO & valor : NAT
-    THEN
-        IF 
-            ct : creditos & 
-            ct /: bloqueados & 
-            valor : 0..limiteMax(ct) 
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-
-    END;
-
-ok <-- pre_consultarValorFatura(ct) =
-    PRE
-        ct : CARTAO
-    THEN
-        IF 
-            ct : creditos
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-
-    END;
-
-ok <-- pre_removerConta(cc) =
-    PRE
-        cc : CONTA
-    THEN
-        IF 
-            cc : contas &
-            cc /: contasRemovidas &
-            !ct.((ct : creditos & titular(ct) = cc) =>
-                (faturaCartao~[{ct}] <: statusFatura~[{paga}] \/ totalFatura~[{0}]))
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-
-    END;
-
-ok <-- pre_consultarFaturasCartao(ct) =
-    PRE
-        ct : CARTAO
-    THEN
-        IF 
-            ct : cartoes &
-            faturaCartao~[{ct}] : FIN(faturaCartao~[{ct}])
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-
-    END;
-
-
-ok <-- pre_consultarFatura(ff) =
-    PRE
-        ff : FATURA
-    THEN
-        IF 
-            ff : faturas
-        THEN
-            ok := TRUE    
-        ELSE
-            ok := FALSE
-        END
-
+            prox := ct
+        END ||
+        ok := TRUE
+    ELSE
+        prox := cartaoDummy ||
+        ok := FALSE
     END
+    
+    
+    
+
 
 END
