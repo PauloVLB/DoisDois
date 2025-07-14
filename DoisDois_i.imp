@@ -643,98 +643,107 @@ ok <-- atualizarLimite(ct, valor) =
 
 ok <-- removerConta(cc) =
     VAR
-        statusConta, possuiFaturaNaoPaga
+        statusConta, pagas
     IN
         statusConta := i_contas(cc);
-        possuiFaturaNaoPaga := FALSE;
+        pagas := TRUE;
         
         IF
-            cc <= maxConta & statusConta = ativa & cc /= contaDummy
+            statusConta = ativa & cc /= contaDummy
         THEN
             VAR ii, cartaoAtivo, titularCartao IN
-                ii := 0;
+                ii := 1;
                 cartaoAtivo := i_cartoes(ii);
                 titularCartao := i_titular(ii);
-                WHILE ii <= maxCartao & possuiFaturaNaoPaga = FALSE DO
+                WHILE ii <= maxCartao & pagas = TRUE DO
                     IF cartaoAtivo = TRUE & titularCartao = cc THEN
-                        VAR jj, faturaAtiva, faturaCartao IN
-                            jj := 0;
-                            faturaAtiva := i_faturas(jj);
-                            faturaCartao := i_faturaCartao(jj);
-                            WHILE jj <= maxFatura & possuiFaturaNaoPaga = FALSE DO
-                                IF faturaAtiva = TRUE & faturaCartao = ii THEN
-                                    VAR statusFatura, totalFatura IN
-                                        statusFatura := i_statusFatura(jj);
-                                        totalFatura := i_totalFatura(jj);
-                                        
-                                        IF statusFatura /= paga & totalFatura > 0 THEN
-                                            possuiFaturaNaoPaga := TRUE
-                                        END
-                                    END
+                        VAR jj, fatura, faturaCartao, statusFatura, totalFatura
+                        IN 
+                            jj := 1; 
+                            pagas := TRUE;
+                            WHILE jj <= maxFatura & pagas = TRUE DO
+                                fatura := i_faturas(jj);
+                                faturaCartao := i_faturaCartao(jj);
+                                statusFatura := i_statusFatura(jj);
+                                totalFatura := i_totalFatura(jj);
+                                
+                                IF fatura = TRUE & faturaCartao = ii & statusFatura /= paga & totalFatura /= 0
+                                THEN 
+                                    pagas := FALSE
                                 END;
                                 jj := jj + 1
                             INVARIANT
-                                1 /= 1
-                            VARIANT
-                                maxFatura + 1 - jj
-                            END
+                                jj : 1..(maxFatura + 1) &
+                                i_faturas : FATURA --> BOOL &
+                                faturas = dom(i_faturas |> {TRUE}) &
+                                i_faturaCartao : FATURA --> CARTAO &
+                                i_statusFatura : FATURA --> STATUSFATURA &
+                                i_totalFatura : FATURA --> NAT &
+                                pagas = TRUE <=> (((1..jj-1) /\ dom(i_faturas |> {TRUE}) /\ dom(i_faturaCartao |> {ii})) <: dom(i_statusFatura |> {paga}) \/ dom(i_totalFatura |> {0}))
+                            VARIANT 
+                                maxFatura - jj + 1
+                            END 
                         END
                     END;
                     ii := ii + 1
                 INVARIANT
-                    1 /= 1
+                    ii : NAT & ii <= (maxCartao + 1) &
+                    i_cartoes : CARTAO --> BOOL &
+                    i_titular : CARTAO --> CONTA &
+                    i_faturas : FATURA --> BOOL &
+                    i_tipoCartao : CARTAO --> TIPOCARTAO &
+                    cartoes = dom(i_cartoes |> {TRUE})     
                 VARIANT
                     maxCartao + 1 - ii
                 END
             END;
-            
-            IF possuiFaturaNaoPaga = FALSE THEN
-                VAR ii, cartaoAtivo, titularCartao, tipoCartao IN
+
+            IF pagas = TRUE THEN
+               i_contas(cc) := removida;
+               VAR ii, cartaoAtivo, titularCartao IN
                     ii := 0;
                     cartaoAtivo := i_cartoes(ii);
                     titularCartao := i_titular(ii);
-                    tipoCartao := i_tipoCartao(ii);
                     WHILE ii <= maxCartao DO
                         IF cartaoAtivo = TRUE & titularCartao = cc THEN
-                            VAR jj, faturaAtiva, faturaCartao IN
-                                jj := 0;
-                                faturaAtiva := i_faturas(jj);
-                                faturaCartao := i_faturaCartao(jj);
+                            i_cartoes(ii) := FALSE;
+                            i_bloqueados(ii) := FALSE;
+                            VAR jj, faturaCartao
+                            IN 
+                                jj := 1; 
+                                pagas := TRUE;
                                 WHILE jj <= maxFatura DO
-                                    IF faturaAtiva = TRUE & faturaCartao = ii THEN
-                                        i_faturas(jj) := FALSE;
-                                        tamFatura := tamFatura - 1
+                                    faturaCartao := i_faturaCartao(jj);
+                                    
+                                    IF faturaCartao = ii 
+                                    THEN 
+                                        i_faturas(jj) := FALSE
                                     END;
                                     jj := jj + 1
                                 INVARIANT
-                                    jj : 0..(maxFatura + 1)
-                                VARIANT
-                                    maxFatura + 1 - jj
-                                END
-                            END;
-                            
-                            i_cartoes(ii) := FALSE;
-                            i_bloqueados(ii) := FALSE;
-                            tamCartao := tamCartao - 1;
-
-                            
-                            IF tipoCartao = credito THEN
-                                tamCredito := tamCredito - 1
+                                    jj : 1..(maxFatura + 1) &
+                                    i_faturas : FATURA --> BOOL &
+                                    faturas = dom(i_faturas |> {TRUE}) &
+                                    i_faturaCartao : FATURA --> CARTAO 
+                                VARIANT 
+                                    maxFatura - jj + 1
+                                END 
                             END
                         END;
                         ii := ii + 1
                     INVARIANT
-                        ii : 0..(maxCartao + 1)
+                        ii : NAT & ii <= (maxCartao + 1) &
+                        i_cartoes : CARTAO --> BOOL &
+                        i_titular : CARTAO --> CONTA &
+                        i_faturas : FATURA --> BOOL &
+                        i_tipoCartao : CARTAO --> TIPOCARTAO &
+                        cartoes = dom(i_cartoes |> {TRUE})     
                     VARIANT
                         maxCartao + 1 - ii
                     END
-                END;
-                i_contas(cc) := removida;
-                i_saldoCorrente(cc) := 0;
-                i_saldoPoupanca(cc) := 0;
-                ok := TRUE
+                END
             ELSE
-                ok := FALSE
+                ok :=  FALSE
             END
         ELSE
             ok := FALSE
