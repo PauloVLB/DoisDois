@@ -488,7 +488,206 @@ ok <-- pagarFatura(cc, ff) =
         
     END;
 
-compraParcelada(co, cd, valor, parcelas) = skip;
+ok <-- compraParcelada(co, cd, valor, parcelas) = 
+    VAR 
+        cartaoAtivo, tipoCartao, contaDestino, cartaoBloqueado,
+        titular, parcela, limite, saldoDestino, maxSaldo, resto
+    IN
+        cartaoAtivo := i_cartoes(co);
+        tipoCartao := i_tipoCartao(co);
+        contaDestino := i_contas(cd);
+        cartaoBloqueado := i_bloqueados(co);
+        titular := i_titular(co);
+        saldoDestino := i_saldoCorrente(cd);
+        limite := i_limite(co);
+        maxSaldo := MAXINT - valor;
+        resto := valor mod parcelas;
+        
+        IF 
+            cartaoAtivo = TRUE & tipoCartao = credito & contaDestino = ativa &
+            cartaoBloqueado = FALSE & titular /= cd & parcelas >= 1 & parcelas <= maxParcelas &
+            valor > 0 & resto = 0 & saldoDestino <= maxSaldo &
+            co /= cartaoDummy & cd /= contaDummy & tamTransacao <= maxTransacao
+        THEN
+            parcela := valor / parcelas;
+            
+            IF 
+                parcela <= limite
+            THEN
+                VAR 
+                    faturaAtualCartao, ordemAtual, overflow, 
+                    faturasNecessarias, faturasExistentesCount, ordemFinal
+                IN
+                    faturaAtualCartao := i_faturaAtual(co);
+                    ordemAtual := i_faturaOrdem(faturaAtualCartao);
+                    overflow := FALSE;
+                    faturasExistentesCount := 0;
+                    ordemFinal := ordemAtual + parcelas - 1;
+                    
+                    /* Verifica overflow nas faturas existentes */
+                    VAR ii, fatura, faturaCartao, faturaOrdem, totalFatura, maxValorFatura IN
+                        ii := 1;
+                        maxValorFatura := MAXINT - parcela;
+                        WHILE ii <= maxFatura & overflow = FALSE DO
+                            fatura := i_faturas(ii);
+                            faturaCartao := i_faturaCartao(ii);
+                            faturaOrdem := i_faturaOrdem(ii);
+                            totalFatura := i_totalFatura(ii);
+                            
+                            IF 
+                                fatura = TRUE & faturaCartao = co &
+                                faturaOrdem >= ordemAtual & faturaOrdem <= ordemFinal
+                            THEN
+                                faturasExistentesCount := faturasExistentesCount + 1;
+                                IF totalFatura > maxValorFatura THEN
+                                    overflow := TRUE
+                                END
+                            END;
+                            ii := ii + 1
+                        INVARIANT
+                            ii : 1..(maxFatura + 1) &
+                            i_faturas : FATURA --> BOOL &
+                            i_faturaCartao : FATURA --> CARTAO &
+                            i_faturaOrdem : FATURA --> NAT &
+                            i_totalFatura : FATURA --> NAT &
+                            faturas = dom(i_faturas |> {TRUE}) &
+                            faturasExistentesCount : NAT 
+                        VARIANT
+                            maxFatura + 1 - ii
+                        END
+                    END;
+                    
+                    faturasNecessarias := parcelas - faturasExistentesCount;
+                    
+                    VAR totalFaturasNecessarias IN
+                        totalFaturasNecessarias := tamFatura + faturasNecessarias;
+                        
+                        IF 
+                            overflow = FALSE & totalFaturasNecessarias <= maxFatura
+                        THEN
+                        /* Criar faturas necessárias */
+                        VAR ordem, ordemInicial, ordemFinalCriacao IN
+                            ordemInicial := ordemAtual + faturasExistentesCount;
+                            ordemFinalCriacao := ordemAtual + parcelas;
+                            ordem := ordemInicial;
+                            WHILE ordem < ordemFinalCriacao DO
+                                VAR ff, atual IN
+                                    ff := 1;
+                                    atual := i_faturas(ff);
+                                    
+                                    WHILE ff < maxFatura & atual = TRUE DO
+                                        ff := ff + 1;
+                                        atual := i_faturas(ff)
+                                    INVARIANT 
+                                        ff : 1..maxFatura &
+                                        i_faturas : FATURA --> BOOL &
+                                        faturas = dom(i_faturas |> {TRUE}) &
+                                        (ff <= maxFatura => atual = i_faturas(ff)) &
+                                        (1..ff-1) <: dom(i_faturas |> {TRUE}) &
+                                        (atual = FALSE => (ff : FATURA & ff /: faturas))
+                                    VARIANT 
+                                        maxFatura - ff
+                                    END;
+                                    
+                                    i_faturas(ff) := TRUE;
+                                    i_faturaCartao(ff) := co;
+                                    i_faturaOrdem(ff) := ordem;
+                                    i_statusFatura(ff) := aberta;
+                                    i_totalFatura(ff) := 0;
+                                    tamFatura := tamFatura + 1
+                                END;
+                                ordem := ordem + 1
+                            INVARIANT
+                                ordem : ordemInicial..ordemFinalCriacao &
+                                i_faturas : FATURA --> BOOL &
+                                i_faturaCartao : FATURA --> CARTAO &
+                                i_faturaOrdem : FATURA --> NAT &
+                                i_statusFatura : FATURA --> STATUSFATURA &
+                                i_totalFatura : FATURA --> NAT &
+                                faturas = dom(i_faturas |> {TRUE})
+                            VARIANT
+                                ordemFinalCriacao - ordem
+                            END
+                        END;
+                        
+                        /* Distribuir parcelas nas faturas */
+                        VAR ii, fatura, faturaCartao, faturaOrdem IN
+                            ii := 1;
+                            WHILE ii <= maxFatura DO
+                                fatura := i_faturas(ii);
+                                faturaCartao := i_faturaCartao(ii);
+                                faturaOrdem := i_faturaOrdem(ii);
+                                
+                                IF 
+                                    fatura = TRUE & faturaCartao = co &
+                                    faturaOrdem >= ordemAtual & faturaOrdem <= ordemFinal
+                                THEN
+                                    i_totalFatura(ii) := i_totalFatura(ii) + parcela
+                                END;
+                                ii := ii + 1
+                            INVARIANT
+                                ii : 1..(maxFatura + 1) &
+                                i_faturas : FATURA --> BOOL &
+                                i_faturaCartao : FATURA --> CARTAO &
+                                i_faturaOrdem : FATURA --> NAT &
+                                i_totalFatura : FATURA --> NAT &
+                                faturas = dom(i_faturas |> {TRUE})
+                            VARIANT
+                                maxFatura + 1 - ii
+                            END
+                        END;
+                        
+                        /* Criar transações */
+                        VAR transacaoDestino, kk IN
+                            /* Transação de depósito na conta destino */
+                            transacaoDestino := tamTransacao;
+                            i_transacoes(transacaoDestino) := TRUE;
+                            i_origem(transacaoDestino) := titular;
+                            i_destino(transacaoDestino) := cd;
+                            i_valorTransacoes(transacaoDestino) := valor;
+                            i_tipoTransacoes(transacaoDestino) := tranDepositoCartao;
+                            tamTransacao := tamTransacao + 1;
+                            
+                            /* Transações de débito do cartão (uma para cada parcela) */
+                            kk := 0;
+                            WHILE kk < parcelas DO
+                                i_transacoes(tamTransacao) := TRUE;
+                                i_origem(tamTransacao) := titular;
+                                i_destino(tamTransacao) := cd;
+                                i_valorTransacoes(tamTransacao) := parcela;
+                                i_tipoTransacoes(tamTransacao) := tranCredito;
+                                tamTransacao := tamTransacao + 1;
+                                kk := kk + 1
+                            INVARIANT
+                                kk : 0..parcelas &
+                                i_transacoes : TRANSACAO --> BOOL &
+                                i_origem : TRANSACAO --> CONTA &
+                                i_destino : TRANSACAO --> CONTA &
+                                i_valorTransacoes : TRANSACAO --> NAT &
+                                i_tipoTransacoes : TRANSACAO --> TIPOTRANSACAO &
+                                transacoes = dom(i_transacoes |> {TRUE})
+                            VARIANT
+                                parcelas - kk
+                            END
+                        END;
+                        
+                        /* Atualizar saldos e limite */
+                        i_saldoCorrente(cd) := i_saldoCorrente(cd) + valor;
+                        i_limite(co) := i_limite(co) - parcela;
+                        
+                        ok := TRUE
+                    ELSE
+                        ok := FALSE
+                    END
+                END
+                END
+            ELSE
+                ok := FALSE
+            END
+        ELSE
+            ok := FALSE
+        END
+    END;
 
 ok <-- pix(co, cd, valor) = 
     VAR 

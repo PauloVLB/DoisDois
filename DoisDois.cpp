@@ -322,8 +322,10 @@ void handleCompraParcelada() {
     if (cd == DoisDois__contaDummy) return;
     int valor = getIntInput(4, 2, "Digite o valor da compra: ");
     int parcelas = getIntInput(5, 2, "Digite o número de parcelas: ");
-    DoisDois__compraParcelada(co, cd, valor, parcelas);
-    showTemporaryMessage(7, 2, "INFO: Operação de compra parcelada enviada.");
+    bool ok;
+    DoisDois__compraParcelada(co, cd, valor, parcelas, &ok);
+    if(ok) showTemporaryMessage(7, 2, "SUCESSO: Compra parcelada realizada.");
+    else showTemporaryMessage(7, 2, "FALHA: Não foi possível realizar a compra parcelada.");
 }
 
 void handlePagarFatura() {

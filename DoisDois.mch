@@ -323,53 +323,57 @@ ok <-- pagarFatura(cc, ff) =
 
 
 // dps add proibição de dummy
-compraParcelada(co, cd, valor, parcelas) =
+ok <-- compraParcelada(co, cd, valor, parcelas) =
     PRE co : CARTAO & cd : CONTA &
-        co : creditos & cd : contas & 
-        titular(co) /= cd & 
-        valor : NAT1 & parcelas : 1..maxParcelas & 
-        (valor / parcelas) : NAT &
-        co /: bloqueados &
-        (valor / parcelas) <= limite(co) &
-	    saldoCorrente(cd) + valor : NAT  &
-        !ff.(ff : faturasExistentes(co, parcelas) => (totalFatura(ff) + valor/parcelas) : NAT)
+        valor : NAT1 & parcelas : NAT
     THEN
-       LET 
-           ordensAusentes, parcela
-       BE 
-           ordensAusentes = card(faturaCartao |> {co})..(faturaOrdem(faturaAtual(co)) + parcelas - 1) &
-           parcela = (valor / parcelas)
-       IN
-           ANY 
-               tDestino, tOrigem,
-               novasFaturas, novaOrdem 
-           WHERE
-               tDestino : TRANSACAO & tDestino /: transacoes &
-               tOrigem <: TRANSACAO - (transacoes \/ {tDestino}) &
-               tOrigem : FIN(tOrigem) & card(tOrigem) = parcelas &
-               
-               novasFaturas <: FATURA - faturas & novasFaturas : FIN(novasFaturas) &
-               card(novasFaturas) = card(ordensAusentes) &
-               novaOrdem : novasFaturas >->> ordensAusentes 
-           THEN
-               /*transações na conta de origem e destino*/
-               transacoes := transacoes \/ {tDestino} \/ tOrigem ||
-               origemTransacoes := origemTransacoes \/ {tDestino |-> titular(co)} \/ (tOrigem * {titular(co)}) ||
-               destinoTransacoes := destinoTransacoes \/ {tDestino |-> cd} \/ (tOrigem * {cd}) ||
-               valorTransacoes := valorTransacoes \/ {tDestino |-> valor} \/ (tOrigem * {parcela}) ||
-               tipoTransacoes := tipoTransacoes \/ {tDestino |-> tranDepositoCartao} \/ (tOrigem * {tranCredito})  ||
-               saldoCorrente(cd) := saldoCorrente(cd) + valor ||
-               
-               limite(co) := limite(co) - parcela ||
-               /*criar faturas novas*/
-               faturas := faturas \/ novasFaturas ||
-               statusFatura := statusFatura \/ (novasFaturas * {aberta}) ||
-               faturaCartao := faturaCartao \/ (novasFaturas * {co}) ||
-               faturaOrdem := faturaOrdem \/ novaOrdem ||
-               totalFatura := totalFatura <+ (%ff.(ff : faturasExistentes(co, parcelas) | totalFatura(ff) + parcela) \/  (novasFaturas * {parcela}))  
-           END 
-       END 
-    END;
+        IF 
+            co : creditos & cd : contas & titular(co) /= cd & parcelas : 1..maxParcelas & 
+            (valor / parcelas) : NAT & (valor / parcelas) <= limite(co) &
+            saldoCorrente(cd) + valor : NAT &
+            !ff.(ff : faturasExistentes(co, parcelas) => (totalFatura(ff) + valor/parcelas) : NAT)
+        THEN
+            LET 
+                ordensAusentes, parcela
+            BE 
+                ordensAusentes = card(faturaCartao |> {co})..(faturaOrdem(faturaAtual(co)) + parcelas - 1) &
+                parcela = (valor / parcelas)
+            IN
+                ANY 
+                    tDestino, tOrigem,
+                    novasFaturas, novaOrdem 
+                WHERE
+                    tDestino : TRANSACAO & tDestino /: transacoes &
+                    tOrigem <: TRANSACAO - (transacoes \/ {tDestino}) &
+                    tOrigem : FIN(tOrigem) & card(tOrigem) = parcelas &
+                    
+                    novasFaturas <: FATURA - faturas & novasFaturas : FIN(novasFaturas) &
+                    card(novasFaturas) = card(ordensAusentes) &
+                    novaOrdem : novasFaturas >->> ordensAusentes 
+                THEN
+                    /*transações na conta de origem e destino*/
+                    transacoes := transacoes \/ {tDestino} \/ tOrigem ||
+                    origemTransacoes := origemTransacoes \/ {tDestino |-> titular(co)} \/ (tOrigem * {titular(co)}) ||
+                    destinoTransacoes := destinoTransacoes \/ {tDestino |-> cd} \/ (tOrigem * {cd}) ||
+                    valorTransacoes := valorTransacoes \/ {tDestino |-> valor} \/ (tOrigem * {parcela}) ||
+                    tipoTransacoes := tipoTransacoes \/ {tDestino |-> tranDepositoCartao} \/ (tOrigem * {tranCredito})  ||
+                    saldoCorrente(cd) := saldoCorrente(cd) + valor ||
+                    
+                    limite(co) := limite(co) - parcela ||
+                    /*criar faturas novas*/
+                    faturas := faturas \/ novasFaturas ||
+                    statusFatura := statusFatura \/ (novasFaturas * {aberta}) ||
+                    faturaCartao := faturaCartao \/ (novasFaturas * {co}) ||
+                    faturaOrdem := faturaOrdem \/ novaOrdem ||
+                    totalFatura := totalFatura <+ (%ff.(ff : faturasExistentes(co, parcelas) | totalFatura(ff) + parcela) \/  (novasFaturas * {parcela}))  
+                END 
+            END ||
+            ok := TRUE
+        ELSE
+            ok := FALSE
+        END
+    END
+       
 
 // dps add proibição de dummy
 ok <-- pix(co, cd, valor) =
