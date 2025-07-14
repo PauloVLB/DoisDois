@@ -618,18 +618,18 @@ void handleHistorico() {
     int y = 3;
     int count = 0;
 
-    const int COL_ID      = 2;
-    const int COL_TIPO    = 9;
-    const int COL_ORIGEM  = 41;
+    const int COL_ID = 2;
+    const int COL_TIPO = 9;
+    const int COL_ORIGEM = 41;
     const int COL_DESTINO = 66;
-    const int COL_VALOR   = 91;
+    const int COL_VALOR = 91;
 
     attron(A_BOLD);
-    mvwprintw(stdscr, y, COL_ID,      "ID");
-    mvwprintw(stdscr, y, COL_TIPO,    "Tipo");
-    mvwprintw(stdscr, y, COL_ORIGEM,  "Origem");
+    mvwprintw(stdscr, y, COL_ID, "ID");
+    mvwprintw(stdscr, y, COL_TIPO, "Tipo");
+    mvwprintw(stdscr, y, COL_ORIGEM, "Origem");
     mvwprintw(stdscr, y, COL_DESTINO, "Destino");
-    mvwprintw(stdscr, y, COL_VALOR,   "Valor");
+    mvwprintw(stdscr, y, COL_VALOR, "Valor");
     attroff(A_BOLD);
     y++;
 
@@ -672,8 +672,8 @@ void handleHistorico() {
                 mvwprintw(stdscr, y, COL_ID, "%d", i);
                 mvwprintw(stdscr, y, COL_VALOR, "%d", vv);
 
-                mvwaddwstr(stdscr, y, COL_TIPO,    to_wstring(tipoTransacaoToString(tp)).c_str());
-                mvwaddwstr(stdscr, y, COL_ORIGEM,  to_wstring(nome_origem).c_str());
+                mvwaddwstr(stdscr, y, COL_TIPO, to_wstring(tipoTransacaoToString(tp)).c_str());
+                mvwaddwstr(stdscr, y, COL_ORIGEM, to_wstring(nome_origem).c_str());
                 mvwaddwstr(stdscr, y, COL_DESTINO, to_wstring(nome_destino).c_str());
 
                 y++;
