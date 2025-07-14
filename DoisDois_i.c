@@ -901,7 +901,6 @@ void DoisDois__removerConta(DoisDois__CONTA cc, bool *ok)
                         int32_t totalFatura;
                         
                         jj = 1;
-                        pagas = true;
                         while(((jj) <= (DoisDois__maxFatura)) &&
                         (pagas == true))
                         {
@@ -961,6 +960,7 @@ void DoisDois__removerConta(DoisDois__CONTA cc, bool *ok)
                     ii = ii+1;
                 }
             }
+            (*ok) = true;
         }
         else
         {

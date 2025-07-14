@@ -861,7 +861,6 @@ ok <-- removerConta(cc) =
                         VAR jj, fatura, faturaCartao, statusFatura, totalFatura
                         IN 
                             jj := 1; 
-                            pagas := TRUE;
                             WHILE jj <= maxFatura & pagas = TRUE DO
                                 fatura := i_faturas(jj);
                                 faturaCartao := i_faturaCartao(jj);
