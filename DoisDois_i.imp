@@ -942,7 +942,8 @@ ok <-- removerConta(cc) =
                     VARIANT
                         maxCartao + 1 - ii
                     END
-                END
+                END;
+                ok := TRUE
             ELSE
                 ok :=  FALSE
             END
