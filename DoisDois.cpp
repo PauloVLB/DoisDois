@@ -22,6 +22,8 @@ std::map<DoisDois__CONTA, std::string> g_reverseAccountMap;
 std::map<std::string, DoisDois__CARTAO> g_cardMap;
 std::map<DoisDois__CARTAO, std::string> g_reverseCardMap;
 
+std::map<DoisDois__CONTA, std::string> g_deletedAccountNames;
+
 void drawHeader(const std::string& title);
 void showTemporaryMessage(int y, int x, const std::string& message);
 void showFullScreenMessage(const std::string& title, const std::string& message);
@@ -194,6 +196,7 @@ void handleRemoverConta() {
     DoisDois__removerConta(cc, &ok);
     if(ok) {
         std::string titular = g_reverseAccountMap[cc];
+        g_deletedAccountNames[cc] = titular;
         g_accountMap.erase(titular);
         g_reverseAccountMap.erase(cc);
         showTemporaryMessage(4, 2, "SUCESSO: Conta removida.");
@@ -361,11 +364,9 @@ void handleConsultarContas() {
         if (ccs[id]) {
             contas_exibidas++;
             std::string titular = g_reverseAccountMap.count(id) ? g_reverseAccountMap[id] : "[Titular Desconhecido]";
-            
-            std::string header_title = "Titular: '" + titular + "' (ID: " + std::to_string(id) + ")";
-            drawSectionHeader(y, header_title);
-            y++;    
-
+            attron(A_BOLD);
+            mvwaddwstr(stdscr, y++, 2, to_wstring("Titular: '" + titular + "' (ID: " + std::to_string(id) + ")").c_str());
+            attroff(A_BOLD);
             int32_t sc, sp;
             bool ok_saldos;
             DoisDois__consultarSaldos(id, &sc, &sp, &ok_saldos);
@@ -548,12 +549,23 @@ void handleHistorico() {
             DoisDois__consultarTransacao(i, &ok_t, &oo, &dd, &vv, &tp);
 
             if (ok_t) {
-                std::string nome_origem = g_reverseAccountMap.count(oo)
-                                          ? g_reverseAccountMap[oo]
-                                          : ("ID " + std::to_string(oo));
-                std::string nome_destino = g_reverseAccountMap.count(dd)
-                                           ? g_reverseAccountMap[dd]
-                                           : ("ID " + std::to_string(dd));
+                std::string nome_origem;
+                if (g_reverseAccountMap.count(oo)) {
+                    nome_origem = g_reverseAccountMap[oo];
+                } else if (g_deletedAccountNames.count(oo)) {
+                    nome_origem = g_deletedAccountNames[oo] + " (Removida)";
+                } else {
+                    nome_origem = "ID " + std::to_string(oo);
+                }
+
+                std::string nome_destino;
+                if (g_reverseAccountMap.count(dd)) {
+                    nome_destino = g_reverseAccountMap[dd];
+                } else if (g_deletedAccountNames.count(dd)) {
+                    nome_destino = g_deletedAccountNames[dd] + " (Removida)";
+                } else {
+                    nome_destino = "ID " + std::to_string(dd);
+                }
 
                 if (oo == dd) {
                     if (tp == DoisDois__depositoCorrente || tp == DoisDois__depositoPoupanca || tp == DoisDois__tranDepositoCartao) {
