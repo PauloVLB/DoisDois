@@ -780,23 +780,6 @@ ok, tipo, ll, llMax, block <-- consultarCartao(ct) =
         END
     END;
 
-
-ok, prox <-- proximaConta =
-    IF
-        CONTA - contas - contasRemovidas /= {}
-    THEN
-        ANY
-            cc
-        WHERE
-            cc : CONTA & cc /: contas & cc /: contasRemovidas
-        THEN
-            prox := cc
-        END ||
-        ok := TRUE
-    ELSE
-        prox := contaDummy ||
-        ok := FALSE
-    END;
     
 ok, prox <-- proximoCartao =
     IF

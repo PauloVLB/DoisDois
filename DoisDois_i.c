@@ -1449,20 +1449,6 @@ void DoisDois__consultarCartao(DoisDois__CARTAO ct, bool *ok, DoisDois__TIPOCART
     }
 }
 
-void DoisDois__proximaConta(bool *ok, DoisDois__CONTA *prox)
-{
-    if((DoisDois__tamConta) < (DoisDois__maxConta))
-    {
-        (*prox) = DoisDois__tamConta+1;
-        (*ok) = true;
-    }
-    else
-    {
-        (*prox) = DoisDois__contaDummy;
-        (*ok) = false;
-    }
-}
-
 void DoisDois__proximoCartao(bool *ok, DoisDois__CARTAO *prox)
 {
     if((DoisDois__tamCartao) < (DoisDois__maxCartao))

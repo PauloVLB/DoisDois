@@ -145,6 +145,7 @@ INITIALISATION
     
 
 OPERATIONS
+
 ok <-- adicionarConta(cc) = 
     BEGIN
         VAR
@@ -1466,17 +1467,6 @@ ok, tipo, ll, llMax, block <-- consultarCartao(ct) =
             block := FALSE; 
             ok := FALSE
         END
-    END;
-
-ok, prox <-- proximaConta =
-    IF
-        tamConta < maxConta
-    THEN
-        prox := tamConta + 1;
-        ok := TRUE
-    ELSE
-        prox := contaDummy;
-        ok := FALSE
     END;
     
 ok, prox <-- proximoCartao =

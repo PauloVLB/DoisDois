@@ -8,6 +8,7 @@
 #include <locale>
 #include <cstdlib>
 #include <optional>
+#include <iomanip>
 
 extern "C" {
     #include "DoisDois.h"
@@ -23,6 +24,8 @@ std::map<std::string, DoisDois__CARTAO> g_cardMap;
 std::map<DoisDois__CARTAO, std::string> g_reverseCardMap;
 
 std::map<DoisDois__CONTA, std::string> g_deletedAccountNames;
+
+int32_t nextAccount = 1;
 
 void drawHeader(const std::string& title);
 void showTemporaryMessage(int y, int x, const std::string& message);
@@ -141,6 +144,40 @@ void drawSectionHeader(int y, const std::string& title) {
     attroff(COLOR_PAIR(CUSTOM_REVERSE_PAIR));
 }
 
+
+int draw_menu(const std::string& title, const std::vector<std::string>& choices) {
+    int highlight = 1;
+    int choice = 0;
+    while (true) {
+        drawHeader(title);
+        int y = 3, x = 4;
+        for (size_t i = 0; i < choices.size(); ++i) {
+            std::wstring choice_w = to_wstring(choices[i]);
+            if (highlight == (int)i + 1) {
+                attron(COLOR_PAIR(CUSTOM_REVERSE_PAIR));
+                mvwaddwstr(stdscr, y + i, x, choice_w.c_str());
+                attroff(COLOR_PAIR(CUSTOM_REVERSE_PAIR));
+            } else {
+                mvwaddwstr(stdscr, y + i, x, choice_w.c_str());
+            }
+        }
+        refresh();
+        int c = getch();
+        switch (c) {
+            case KEY_UP: highlight = (highlight == 1) ? choices.size() : highlight - 1; break;
+            case KEY_DOWN: highlight = (highlight == (int)choices.size()) ? 1 : highlight + 1; break;
+            case 10: choice = highlight; break;
+            case 'q': case '0':
+                for(size_t i = 0; i < choices.size(); ++i) {
+                    if (choices[i].rfind("0. ", 0) == 0) return i + 1;
+                }
+                break;
+        }
+        if (choice != 0) break;
+    }
+    return choice;
+}
+
 DoisDois__CONTA getAccountFromTitular(int y, int x, const std::string& prompt) {
     std::string titular = getStringInput(y, x, prompt);
     if (g_accountMap.count(titular)) {
@@ -166,25 +203,19 @@ void handleAdicionarConta() {
     if (titular.empty()) { showTemporaryMessage(4, 2, "FALHA: O nome do titular não pode ser vazio."); return; }
     if (g_accountMap.count(titular)) { showTemporaryMessage(4, 2, "FALHA: Já existe uma conta com este titular."); return; }
 
-    bool ok_prox;
-    DoisDois__CONTA proxima_conta_id;
-    DoisDois__proximaConta(&ok_prox, &proxima_conta_id);
-
-    if (!ok_prox) {
-        showTemporaryMessage(4, 2, "FALHA: Limite máximo de contas no sistema foi atingido.");
-        return;
-    }
-
+    if (nextAccount > DoisDois__CONTA__max) { showTemporaryMessage(4, 2, "FALHA: Limite máximo de contas no sistema foi atingido."); return; }
+    
     bool ok_add;
-    DoisDois__adicionarConta(proxima_conta_id, &ok_add);
+    DoisDois__adicionarConta(nextAccount, &ok_add);
     if (ok_add) {
-        g_accountMap[titular] = proxima_conta_id;
-        g_reverseAccountMap[proxima_conta_id] = titular;
+        g_accountMap[titular] = nextAccount;
+        g_reverseAccountMap[nextAccount] = titular;
         std::stringstream ss;
-        ss << "SUCESSO: Conta para '" << titular << "' adicionada com ID " << proxima_conta_id << ".";
+        ss << "SUCESSO: Conta para '" << titular << "' adicionada com ID " << nextAccount << ".";
+        nextAccount++;
         showTemporaryMessage(4, 2, ss.str());
     } else {
-        showTemporaryMessage(4, 2, "FALHA: Não foi possível adicionar a conta no sistema base (ID pode já estar em uso).");
+        showTemporaryMessage(4, 2, "FALHA: Não foi possível adicionar a conta no sistema base.");
     }
 }
 
@@ -343,15 +374,78 @@ void handleCompraParcelada() {
     else showTemporaryMessage(7, 2, "FALHA: Não foi possível realizar a compra parcelada.");
 }
 
+std::optional<int> selectFaturaFromCard(DoisDois__CARTAO ct) {
+    drawHeader("Selecione a Fatura");
+
+    bool ok_faturas, ftCartao[DoisDois__FATURA__max + 1];
+    DoisDois__consultarFaturasCartao(ct, &ok_faturas, ftCartao);
+
+    if (!ok_faturas) {
+        showTemporaryMessage(3, 2, "FALHA: Cartão não existe ou não é de crédito.");
+        return std::nullopt;
+    }
+
+    std::vector<std::string> choices;
+    std::vector<int> fatura_ids; 
+
+    for (int i = 1; i <= DoisDois__FATURA__max; i++) {
+        if (ftCartao[i]) {
+            bool ok_f, atual_f; 
+            DoisDois__CARTAO ct_f; 
+            int32_t tt_f, oo_f; 
+            DoisDois__STATUSFATURA st_f;
+            DoisDois__consultarFatura(i, &ok_f, &ct_f, &tt_f, &oo_f, &st_f, &atual_f);
+
+            if (ok_f) {
+                std::stringstream ss;
+                ss << "ID: "   << std::left << std::setw(5) << i
+                   << "Status: " << std::left << std::setw(10) << statusFaturaToString(st_f)
+                   << "Total: "  << std::left << std::setw(8) << tt_f
+                   << (atual_f ? " (FATURA ATUAL)" : "");
+                
+                choices.push_back(ss.str());
+                fatura_ids.push_back(i);
+            }
+        }
+    }
+
+    if (choices.empty()) {
+        showTemporaryMessage(3, 2, "Nenhuma fatura encontrada para este cartão.");
+        return std::nullopt;
+    }
+
+    choices.push_back("< Voltar");
+
+    int menu_choice = draw_menu("Faturas Disponíveis", choices);
+
+    if (menu_choice == (int)choices.size()) {
+        return std::nullopt;
+    }
+
+    return fatura_ids[menu_choice - 1];
+}
+
 void handlePagarFatura() {
     drawHeader("Pagar Fatura");
-    DoisDois__CONTA cc = getAccountFromTitular(2, 2, "Nome do titular da conta pagadora: ");
-    if (cc == DoisDois__contaDummy) return;
-    int ff = getIntInput(3, 2, "Digite o ID da fatura a ser paga: ");
+
+    DoisDois__CARTAO ct = getCardFromApelido(2, 2, "Apelido do cartão de crédito a pagar: ");
+    if (ct == DoisDois__cartaoDummy) return;
+
+    std::optional<int> fatura_selecionada_opt = selectFaturaFromCard(ct);
+    
+    if (!fatura_selecionada_opt) {
+        return; 
+    }
+    int ff = *fatura_selecionada_opt;
+
     bool ok;
-    DoisDois__pagarFatura(cc, ff, &ok);
-    if(ok) showTemporaryMessage(5, 2, "SUCESSO: Fatura paga.");
-    else showTemporaryMessage(5, 2, "FALHA: Não foi possível pagar a fatura.");
+    DoisDois__pagarFatura(ct, ff, &ok);
+
+    if(ok) {
+        showTemporaryMessage(7, 2, "SUCESSO: Fatura paga.");
+    } else {
+        showTemporaryMessage(7, 2, "FALHA: Não foi possível pagar a fatura");
+    }
 }
 
 void handleConsultarContas() {
@@ -713,39 +807,6 @@ void handlePassarMes() {
     waitForEnter(); 
 }
 
-
-int draw_menu(const std::string& title, const std::vector<std::string>& choices) {
-    int highlight = 1;
-    int choice = 0;
-    while (true) {
-        drawHeader(title);
-        int y = 3, x = 4;
-        for (size_t i = 0; i < choices.size(); ++i) {
-            std::wstring choice_w = to_wstring(choices[i]);
-            if (highlight == (int)i + 1) {
-                attron(COLOR_PAIR(CUSTOM_REVERSE_PAIR));
-                mvwaddwstr(stdscr, y + i, x, choice_w.c_str());
-                attroff(COLOR_PAIR(CUSTOM_REVERSE_PAIR));
-            } else {
-                mvwaddwstr(stdscr, y + i, x, choice_w.c_str());
-            }
-        }
-        refresh();
-        int c = getch();
-        switch (c) {
-            case KEY_UP: highlight = (highlight == 1) ? choices.size() : highlight - 1; break;
-            case KEY_DOWN: highlight = (highlight == (int)choices.size()) ? 1 : highlight + 1; break;
-            case 10: choice = highlight; break;
-            case 'q': case '0':
-                for(size_t i = 0; i < choices.size(); ++i) {
-                    if (choices[i].rfind("0. ", 0) == 0) return i + 1;
-                }
-                break;
-        }
-        if (choice != 0) break;
-    }
-    return choice;
-}
 
 void showMenuContas() {
     std::vector<std::string> choices = {

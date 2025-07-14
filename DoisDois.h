@@ -111,7 +111,6 @@ extern void DoisDois__consultarFatura(DoisDois__FATURA ff, bool *ok, DoisDois__C
 extern void DoisDois__consultarValorFatura(DoisDois__CARTAO ct, bool *ok, int32_t *vf);
 extern void DoisDois__consultarCartoesConta(DoisDois__CONTA cc, bool *ok, bool *cts);
 extern void DoisDois__consultarCartao(DoisDois__CARTAO ct, bool *ok, DoisDois__TIPOCARTAO *tipo, int32_t *ll, int32_t *llMax, bool *block);
-extern void DoisDois__proximaConta(bool *ok, DoisDois__CONTA *prox);
 extern void DoisDois__proximoCartao(bool *ok, DoisDois__CARTAO *prox);
 
 #ifdef __cplusplus
