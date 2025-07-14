@@ -427,25 +427,13 @@ std::optional<int> selectFaturaFromCard(DoisDois__CARTAO ct) {
 
 void handlePagarFatura() {
     drawHeader("Pagar Fatura");
-
-    DoisDois__CARTAO ct = getCardFromApelido(2, 2, "Apelido do cartão de crédito a pagar: ");
-    if (ct == DoisDois__cartaoDummy) return;
-
-    std::optional<int> fatura_selecionada_opt = selectFaturaFromCard(ct);
-    
-    if (!fatura_selecionada_opt) {
-        return; 
-    }
-    int ff = *fatura_selecionada_opt;
-
+    DoisDois__CONTA cc = getAccountFromTitular(2, 2, "Nome do titular da conta pagadora: ");
+    if (cc == DoisDois__contaDummy) return;
+    int ff = getIntInput(3, 2, "Digite o ID da fatura a ser paga: ");
     bool ok;
-    DoisDois__pagarFatura(ct, ff, &ok);
-
-    if(ok) {
-        showTemporaryMessage(7, 2, "SUCESSO: Fatura paga.");
-    } else {
-        showTemporaryMessage(7, 2, "FALHA: Não foi possível pagar a fatura");
-    }
+    DoisDois__pagarFatura(cc, ff, &ok);
+    if(ok) showTemporaryMessage(5, 2, "SUCESSO: Fatura paga.");
+    else showTemporaryMessage(5, 2, "FALHA: Não foi possível pagar a fatura.");
 }
 
 void handleConsultarContas() {
