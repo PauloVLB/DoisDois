@@ -127,6 +127,18 @@ int getIntInput(int y, int x, const std::string& prompt_str) {
     return value;
 }
 
+void drawSectionHeader(int y, const std::string& title) {
+    std::string text_to_draw = " " + title + " ";
+    std::wstring w_text = to_wstring(text_to_draw);
+    int x_center = (COLS - wstring_width(w_text)) / 2;
+    if (x_center < 0) x_center = 0;
+
+    attron(COLOR_PAIR(CUSTOM_REVERSE_PAIR));
+    mvwhline(stdscr, y, 0, ' ', COLS); 
+    mvwaddwstr(stdscr, y, x_center, w_text.c_str());
+    attroff(COLOR_PAIR(CUSTOM_REVERSE_PAIR));
+}
+
 DoisDois__CONTA getAccountFromTitular(int y, int x, const std::string& prompt) {
     std::string titular = getStringInput(y, x, prompt);
     if (g_accountMap.count(titular)) {
@@ -349,9 +361,11 @@ void handleConsultarContas() {
         if (ccs[id]) {
             contas_exibidas++;
             std::string titular = g_reverseAccountMap.count(id) ? g_reverseAccountMap[id] : "[Titular Desconhecido]";
-            attron(A_BOLD);
-            mvwaddwstr(stdscr, y++, 2, to_wstring("Titular: '" + titular + "' (ID: " + std::to_string(id) + ")").c_str());
-            attroff(A_BOLD);
+            
+            std::string header_title = "Titular: '" + titular + "' (ID: " + std::to_string(id) + ")";
+            drawSectionHeader(y, header_title);
+            y++;    
+
             int32_t sc, sp;
             bool ok_saldos;
             DoisDois__consultarSaldos(id, &sc, &sp, &ok_saldos);
@@ -562,7 +576,7 @@ void handleHistorico() {
     }
 
     if (count == 0) {
-        mvprintw(y, 2, "Nenhuma transação encontrada.");
+        mvprintw(++y, 2, "Nenhuma transação encontrada.");
     }
 
     waitForEnter();
@@ -575,8 +589,8 @@ int displaySystemState(int start_y) {
     const int ACC_COL_SC = 25;
     const int ACC_COL_SP = 44;
 
+    drawSectionHeader(y, "Contas");
     attron(A_BOLD);
-    mvwprintw(stdscr, y, ACC_COL_TITULAR, "--- Contas ---");
     y++;
     mvwprintw(stdscr, y, ACC_COL_TITULAR, "Titular");
     mvwprintw(stdscr, y, ACC_COL_SC, "Saldo Corrente");
@@ -605,17 +619,15 @@ int displaySystemState(int start_y) {
     }
     if (contas_exibidas == 0) mvprintw(y++, 2, "Nenhuma conta ativa.");
 
-    y++;
+    y+=2;
 
-    const int FAT_COL_ID = 6;
-    const int FAT_COL_ORDEM = 13;
-    const int FAT_COL_STATUS = 22;
-    const int FAT_COL_TOTAL = 35;
-    const int FAT_COL_OBS = 47;
-
-    attron(A_BOLD);
-    mvwprintw(stdscr, y++, 2, "--- Faturas de Cartões de Crédito ---");
-    attroff(A_BOLD);
+    const int FAT_COL_ID = 2;   
+    const int FAT_COL_ORDEM = 10;  
+    const int FAT_COL_STATUS = 19;  
+    const int FAT_COL_TOTAL = 32;  
+    const int FAT_COL_OBS = 44;  
+    
+    drawSectionHeader(y++, "Faturas de Cartões de Crédito");
 
     int faturas_exibidas_total = 0;
     for (const auto& [apelido, card_id] : g_cardMap) {
@@ -658,10 +670,11 @@ int displaySystemState(int start_y) {
                         }
                     }
                 }
+                y++;
             }
         }
     }
-    if (faturas_exibidas_total == 0) mvprintw(y++, 4, "Nenhuma fatura de crédito ativa encontrada.");
+    if (faturas_exibidas_total == 0) mvprintw(++y, 4, "Nenhuma fatura de crédito ativa encontrada.");
 
     return y;
 }
@@ -669,7 +682,7 @@ int displaySystemState(int start_y) {
 
 void handlePassarMes() {
     drawHeader("Passar o Mês - Estado ANTES");
-    displaySystemState(4); // Exibe o estado inicial a partir da linha 4
+    displaySystemState(4); 
     
     mvprintw(LINES - 1, 0, "Pressione qualquer tecla para EXECUTAR a passagem do mês...");
     getch();
