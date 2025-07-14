@@ -169,7 +169,7 @@ int draw_menu(const std::string& title, const std::vector<std::string>& choices)
             case 10: choice = highlight; break;
             case 'q': case '0':
                 for(size_t i = 0; i < choices.size(); ++i) {
-                    if (choices[i].rfind("0. ", 0) == 0) return i + 1;
+                    if (choices[i].rfind("[x]", 0) == 0) return i + 1;
                 }
                 break;
         }
