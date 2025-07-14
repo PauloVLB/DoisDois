@@ -815,7 +815,8 @@ ok <-- atualizarLimiteMax(ct, valor) =
                 IF limiteAtual > valor THEN
                     i_limite(ct) := valor
                 END
-            END
+            END;
+            ok := TRUE
         ELSE
             ok := FALSE
         END
